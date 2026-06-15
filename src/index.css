@@ -1,0 +1,207 @@
+@import "tailwindcss";
+
+*{
+  box-sizing: border-box;
+}
+
+:root {
+  /* COLORS - LIGHT THEME */
+  --background: #f9fafb;
+  --foreground: #111827;
+
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
+
+  --secondary: #e5e7eb;
+  --secondary-foreground: #111827;
+
+  --muted: #f3f4f6;
+  --muted-foreground: #6b7280;
+
+  --border: #d1d5db;
+  --card: #ffffff;
+
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+
+  /* RADIUS */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  /* SHADOWS */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 4px 6px rgba(0, 0, 0, 0.15);
+
+  /* TRANSITIONS */
+  --transition: all 0.2s ease-out;
+}
+
+.dark {
+  /* COLORS - DARK THEME */
+  --background: #0f172a;
+  --foreground: #f9fafb;
+
+  --primary: #3b82f6;
+  --primary-foreground: #ffffff;
+
+  --secondary: #1e293b;
+  --secondary-foreground: #f9fafb;
+
+  --muted: #1e293b;
+  --muted-foreground: #9ca3af;
+
+  --border: #334155;
+  --card: #1e293b;
+
+  --success: #22c55e;
+  --warning: #fbbf24;
+  --danger: #f87171;
+}
+
+@theme {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-border: var(--border);
+  --color-card: var(--card);
+
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+}
+
+/* =========================================================
+   BASE STYLES
+========================================================= */
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background: var(--background);
+    color: var(--foreground);
+
+    font-family:
+      Inter,
+      system-ui,
+      sans-serif;
+
+    font-feature-settings: "liga" on;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  button {
+    cursor: pointer;
+    transition: var(--transition);
+  }
+
+  img {
+    display: block;
+    max-width: 100%;
+  }
+
+  input,
+  textarea,
+  select {
+    outline: none;
+    transition: var(--transition);
+  }
+}
+
+/* =========================================================
+   CUSTOM UTILITIES
+========================================================= */
+
+@utility flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@utility page-container {
+  width: 100%;
+  margin-inline: auto;
+  padding-inline: 1rem;
+  /* max-width: 1280px; */
+}
+
+@utility card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition);
+}
+
+/* =========================================================
+   SCROLLBAR
+========================================================= */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #475569;
+}
+
+/* =========================================================
+   SELECTION
+========================================================= */
+
+::selection {
+  background: #2563eb;
+  color: white;
+}
+
+.app-table .p-datatable-thead > tr > th {
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.app-table .p-datatable-tbody > tr > td {
+  padding: 0.625rem 1rem;
+  font-size: 0.875rem;
+}
+
+.app-table .p-column-filter {
+  width: 100%;
+}
+
+.app-table .p-inputtext {
+  padding: 0.5rem 0.75rem;
+}
+
+.app-table .p-paginator {
+  padding: 0.5rem;
+}
