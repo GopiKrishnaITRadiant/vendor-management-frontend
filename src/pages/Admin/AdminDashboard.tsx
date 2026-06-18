@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState,useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "primereact/button";
+import {getAdminDashboard, getPOSummary} from "../../services/DashboardService";
 
 // ─── Types ───────────────────────────────────────────────
 
@@ -62,7 +63,33 @@ const BAR_MAX = 55;
 // ─── Component ───────────────────────────────────────────
 
 export default function AdminDashboardPage() {
+  const [dashboard, setDashboard] = useState<any | null>(null);
+  const [monthlyASN, setMonthlyASN] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const loadDashboard = async () => {
+      try {
+        setLoading(true);
+
+        const [dashboardRes, poSummaryRes] =
+          await Promise.all([
+            getAdminDashboard(),
+            getPOSummary(),
+          ]);
+
+        setDashboard(dashboardRes);
+        setMonthlyASN(dashboardRes?.monthlyActivity || []);
+      } catch (error) {
+        console.error("Dashboard API Error:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadDashboard();
+  }, []);
 
   return (
     <div className="page-container py-6 space-y-6">
@@ -84,10 +111,10 @@ export default function AdminDashboardPage() {
       {/* KPI CARDS */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         {[
-          { label: "Total POs", value: "1,245", sub: "+12 this week", icon: "pi pi-file", color: "text-primary" },
-          { label: "Pending ASNs", value: "8", sub: "Awaiting approval", icon: "pi pi-clock", color: "text-warning" },
-          { label: "Active Vendors", value: "24", sub: "3 suspended", icon: "pi pi-building", color: "text-success" },
-          { label: "Completed Orders", value: "191", sub: "This month", icon: "pi pi-check-circle", color: "text-success" },
+          { label: "Total POs", value: dashboard?.stats?.totalPOs, sub: `${+dashboard?.stats?.totalPOsThisWeek} this week`, icon: "pi pi-file", color: "text-primary" },
+          { label: "Pending ASNs", value: dashboard?.stats?.pendingASNs??0, sub: "Awaiting approval", icon: "pi pi-clock", color: "text-warning" },
+          { label: "Active Vendors", value: dashboard?.stats?.activeVendors??0, sub: `${dashboard?.stats?.suspendedVendors??0} suspended`, icon: "pi pi-building", color: "text-success" },
+          { label: "Completed Orders", value: dashboard?.stats?.completedOrders??0, sub: `This month ${dashboard?.stats?.completedThisMonth??0} `, icon: "pi pi-check-circle", color: "text-success" },
         ].map((card) => (
           <div key={card.label} className="card p-5">
             <div className="flex items-start justify-between">
@@ -116,7 +143,7 @@ export default function AdminDashboardPage() {
           </div>
 
           <div className="flex items-end gap-3 h-40 pt-2">
-            {monthlyASN.map((m) => (
+            {dashboard?.monthlyActivity?.map((m:any) => (
               <div key={m.month} className="flex-1 flex flex-col items-center gap-1">
                 <div className="w-full flex items-end gap-0.5 h-32">
                   <div

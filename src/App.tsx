@@ -53,14 +53,14 @@ function AppRoutes() {
       <Route element={<MainLayout />}>
 
         {/* ── Vendor routes (role: vendor) ───────────── */}
-        <Route element={<ProtectedRoute allowedRoles={["vendor"]} />}>
+        {/* <Route element={<ProtectedRoute allowedRoles={["vendor"]} />}> */}
           <Route element={<VendorLayout />}>
             <Route index path="/vendor-dashboard" element={<VendorDashboardPage />} />
             <Route path="/purchase-orders" element={<PurchaseOrdersPage />} />
             <Route path="/asn/create" element={<CreateASNPage />} />
             <Route path="/asn/history" element={<ASNHistoryPage />} />
           </Route>
-        </Route>
+        {/* </Route> */}
 
         {/* ── Admin routes (role: admin) ─────────────── */}
         {/* <Route element={<ProtectedRoute allowedRoles={["admin"]} />}> */}

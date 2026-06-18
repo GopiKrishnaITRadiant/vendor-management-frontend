@@ -29,6 +29,7 @@ type AppTableProps<T> = {
   selectionMode?: "single" | "multiple";
 
   globalSearch?: boolean;
+  onSearchChange?: (value: string) => void;
 
   onPageChange?: (event: any) => void;
 
@@ -55,6 +56,7 @@ export default function AppTable<T extends { id: number | string }>({
   globalSearch = true,
 
   onPageChange,
+  onSearchChange,
 
   onSelectionChange,
 
@@ -91,15 +93,9 @@ export default function AppTable<T extends { id: number | string }>({
   const onGlobalFilterChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
 
-    setFilters((prev: any) => ({
-      ...prev,
-      global: {
-        ...prev.global,
-        value,
-      },
-    }));
-
     setGlobalFilterValue(value);
+
+    onSearchChange?.(value); // 🔥 send to parent
   };
 
   const hasActions = onView || onEdit || onDelete;
@@ -155,14 +151,15 @@ export default function AppTable<T extends { id: number | string }>({
         value={data}
         dataKey="id"
         paginator
+        lazy
         rows={rows}
         first={first}
         totalRecords={totalRecords || data.length}
         onPage={onPageChange}
         loading={loading}
-        filters={filters}
-        onFilter={(e) => setFilters(e.filters)}
-        globalFilterFields={columns.map((c) => String(c.field))}
+        // filters={filters}
+        // onFilter={(e) => setFilters(e.filters)}
+        // globalFilterFields={columns.map((c) => String(c.field))}
         header={header}
         selection={selectedRows}
         onSelectionChange={(e) => {
