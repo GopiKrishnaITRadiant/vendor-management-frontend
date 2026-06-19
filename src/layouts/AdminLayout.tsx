@@ -30,7 +30,7 @@ const navGroups: NavGroup[] = [
   {
     group: "Operations",
     items: [
-      { label: "ASN Approvals", icon: "pi pi-inbox", path: "/admin/asn-approvals", badge: 8 },
+      { label: "ASN Approvals", icon: "pi pi-inbox", path: "/admin/asn-approvals", },
       { label: "Purchase Orders", icon: "pi pi-file", path: "/admin/purchase-orders" },
     ],
   },

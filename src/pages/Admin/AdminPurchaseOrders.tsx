@@ -68,31 +68,31 @@ export default function AdminPurchaseOrdersPage() {
   }, []);
 
   const loadPurchaseOrders = async () => {
-  try {
-    setLoading(true);
+    try {
+      setLoading(true);
 
-    const poResponse = await getPurchaseOrders(
-      page,
-      rows,
-      debouncedSearch
-    );
+      const poResponse = await getPurchaseOrders(
+        page,
+        rows,
+        debouncedSearch
+      );
 
-    setPos(poResponse.data);
-    setTotalRecords(poResponse.total);
-  } catch (error:any) {
-    console.error(error);
-    toast.current?.show({
-      severity: "error",
-      summary: "Error",
-      detail:
-        error?.response?.data?.message ||
-        "Failed to load purchase orders",
-      life: 3000,
-    });
-  } finally {
-    setLoading(false);
-  }
-};
+      setPos(poResponse.data);
+      setTotalRecords(poResponse.total);
+    } catch (error:any) {
+      console.error(error);
+      toast.current?.show({
+        severity: "error",
+        summary: "Error",
+        detail:
+          error?.response?.data?.message ||
+          "Failed to load purchase orders",
+        life: 3000,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadDashboard = async () => {
     try {

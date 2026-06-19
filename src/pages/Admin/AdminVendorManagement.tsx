@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import { Button } from "primereact/button";
 import { Dialog } from "primereact/dialog";
 import { Dropdown } from "primereact/dropdown";
@@ -6,141 +6,341 @@ import { InputText } from "primereact/inputtext";
 import { Toast } from "primereact/toast";
 import { ConfirmDialog, confirmDialog } from "primereact/confirmdialog";
 import AppTable from "../../components/table/DataTable";
+import { useDebounce } from "../../hooks/DebounceHook";
+import {
+  getAllUsers,
+  getUserCounts,
+  updateUser,
+  suspendUser,
+  activateUser,
+  resendVerification,
+} from "../../services/usersService";
 
-// ─── Types ───────────────────────────────────────────────
-
-type VendorStatus = "Active" | "Inactive" | "Suspended";
+type UserStatus = "active" | "inactive" | "suspended" | "pending_verification";
 
 type Vendor = {
   id: number;
-  vendorCode: string;
-  vendorName: string;
-  contactPerson: string;
+  firstName: string;
+  lastName: string;
   email: string;
-  phone: string;
-  address: string;
-  city: string;
-  state: string;
-  country: string;
-  pincode: string;
-  category: string;
-  gstin: string;
-  status: VendorStatus;
-  totalOrders: number;
-  onTimeDelivery: string;
-  joinedDate: string;
+  status: UserStatus;
+  isEmailVerified: boolean;
+  isFirstLoginVerified: boolean;
+  sapVendorId: string | null;
+  lastLoginAt: string | null;
+  lastLoginIp: string | null;
+  createdAt: string;
+  updatedAt: string;
 };
 
-// ─── Mock Data ───────────────────────────────────────────
+type EditableVendorFields = Pick<
+  Vendor,
+  "firstName" | "lastName" | "email" | "status"
+>;
 
-const initialVendors: Vendor[] = [
-  { id: 1, vendorCode: "VND001", vendorName: "Exelan Pharma", contactPerson: "Rajesh Kumar", email: "rajesh@exelan.com", phone: "+91 98765 43210", address: "Plot 12, Phase II, IDA", city: "Hyderabad", state: "Telangana", country: "India", pincode: "500072", category: "API Manufacturer", gstin: "36AABCE1234F1Z5", status: "Active", totalOrders: 142, onTimeDelivery: "94%", joinedDate: "2020-01-15" },
-  { id: 2, vendorCode: "VND002", vendorName: "Health Corp", contactPerson: "Sunita Rao", email: "sunita@healthcorp.com", phone: "+91 91234 56789", address: "Unit 5, MIDC Andheri", city: "Mumbai", state: "Maharashtra", country: "India", pincode: "400093", category: "Formulation", gstin: "27AABCH5678G1Z2", status: "Active", totalOrders: 98, onTimeDelivery: "88%", joinedDate: "2020-06-20" },
-  { id: 3, vendorCode: "VND003", vendorName: "Medi Supplies", contactPerson: "Arvind Shah", email: "arvind@medisupplies.com", phone: "+91 99887 76655", address: "Block C, Naroda Industrial Area", city: "Ahmedabad", state: "Gujarat", country: "India", pincode: "382330", category: "Packaging", gstin: "24AABCM9012H1Z8", status: "Active", totalOrders: 76, onTimeDelivery: "91%", joinedDate: "2021-03-10" },
-  { id: 4, vendorCode: "VND004", vendorName: "BioGen Labs", contactPerson: "Meena Pillai", email: "meena@biogen.com", phone: "+91 93456 78901", address: "Survey No. 45, Hinjewadi", city: "Pune", state: "Maharashtra", country: "India", pincode: "411057", category: "API Manufacturer", gstin: "27AABCB3456I1Z6", status: "Inactive", totalOrders: 34, onTimeDelivery: "79%", joinedDate: "2021-09-01" },
-  { id: 5, vendorCode: "VND005", vendorName: "GlobalChem Inc", contactPerson: "James Wilson", email: "jwilson@globalchem.com", phone: "+1 555 234 5678", address: "123 Pharma Drive, Edison", city: "New Jersey", state: "NJ", country: "USA", pincode: "08817", category: "API Manufacturer", gstin: "N/A", status: "Active", totalOrders: 61, onTimeDelivery: "96%", joinedDate: "2022-01-05" },
-  { id: 6, vendorCode: "VND006", vendorName: "PharmaKraft", contactPerson: "Priya Nair", email: "priya@pharmakraft.com", phone: "+91 87654 32109", address: "Old Mahabalipuram Rd, Sholinganallur", city: "Chennai", state: "Tamil Nadu", country: "India", pincode: "600119", category: "Formulation", gstin: "33AABCP7890J1Z3", status: "Suspended", totalOrders: 22, onTimeDelivery: "65%", joinedDate: "2022-08-15" },
+const STATUS_OPTIONS = [
+  { label: "Active", value: "active" },
+  { label: "Inactive", value: "inactive" },
+  { label: "Suspended", value: "suspended" },
+  { label: "Pending Verification", value: "pending_verification" },
 ];
 
-const categoryOptions = [
-  { label: "API Manufacturer", value: "API Manufacturer" },
-  { label: "Formulation", value: "Formulation" },
-  { label: "Packaging", value: "Packaging" },
-  { label: "Logistics", value: "Logistics" },
-];
-
-const statusOptions = [
-  { label: "Active", value: "Active" },
-  { label: "Inactive", value: "Inactive" },
-  { label: "Suspended", value: "Suspended" },
-];
-
-const countryOptions = [
-  { label: "India", value: "India" },
-  { label: "USA", value: "USA" },
-  { label: "Germany", value: "Germany" },
-  { label: "UK", value: "UK" },
-];
-
-const emptyVendor: Partial<Vendor> = {
-  country: "India",
-  status: "Active",
-  totalOrders: 0,
-  onTimeDelivery: "0%",
-  joinedDate: new Date().toISOString().split("T")[0],
+const STATUS_BADGE: Record<UserStatus, { label: string; className: string }> = {
+  active: { label: "Active", className: "bg-green-100 text-green-700" },
+  inactive: { label: "Inactive", className: "bg-gray-100 text-gray-600" },
+  suspended: { label: "Suspended", className: "bg-red-100 text-red-700" },
+  pending_verification: {
+    label: "Pending",
+    className: "bg-amber-100 text-amber-700",
+  },
 };
 
-// ─── Component ───────────────────────────────────────────
+const emptyVendorForm: Partial<EditableVendorFields> = {
+  status: "pending_verification",
+};
 
 export default function AdminVendorManagementPage() {
   const toast = useRef<Toast>(null);
-  const [vendors, setVendors] = useState<Vendor[]>(initialVendors);
-  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<string | null>(null);
 
+  // ── Table state ───────────────────────────────────────
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [rows, setRows] = useState(10);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 500);
+  const [statusFilter, setStatusFilter] = useState<UserStatus | null>(null);
+
+  // ── KPI counts — single API call ──────────────────────
+  const [counts, setCounts] = useState({
+    total: 0,
+    active: 0,
+    inactive: 0,
+    suspended: 0,
+    pending: 0,
+  });
+  const [countsLoading, setCountsLoading] = useState(true);
+
+  // ── Dialog state ──────────────────────────────────────
   const [viewDialogVisible, setViewDialogVisible] = useState(false);
   const [formDialogVisible, setFormDialogVisible] = useState(false);
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
-  const [editingVendor, setEditingVendor] = useState<Partial<Vendor>>(emptyVendor);
-  const [isEditing, setIsEditing] = useState(false);
+  const [editingVendor, setEditingVendor] =
+    useState<Partial<EditableVendorFields>>(emptyVendorForm);
+  const [actionLoading, setActionLoading] = useState(false);
 
-  const filtered = vendors.filter((v) => {
-    if (categoryFilter && v.category !== categoryFilter) return false;
-    if (statusFilter && v.status !== statusFilter) return false;
-    return true;
-  });
+  // ── Guards against duplicate / stale requests ─────────
+  // requestIdRef ensures only the LATEST request's response is applied
+  // (handles StrictMode double-invoke + rapid filter changes)
+  const vendorsRequestId = useRef(0);
+  const countsFetchedOnce = useRef(false);
 
-  const counts = {
-    total: vendors.length,
-    active: vendors.filter((v) => v.status === "Active").length,
-    inactive: vendors.filter((v) => v.status === "Inactive").length,
-    suspended: vendors.filter((v) => v.status === "Suspended").length,
+  // ── Load vendors — guarded against stale/duplicate responses ──
+  const loadVendors = useCallback(async () => {
+    const requestId = ++vendorsRequestId.current;
+
+    try {
+      setLoading(true);
+      const response = await getAllUsers(
+        page,
+        rows,
+        debouncedSearch,
+        '3',
+        statusFilter ?? undefined,
+      );
+
+      if (requestId !== vendorsRequestId.current) return;
+
+      setVendors(response.data);
+      setTotalRecords(response.total);
+    } catch (error: any) {
+      if (requestId !== vendorsRequestId.current) return;
+      toast.current?.show({
+        severity: "error",
+        summary: "Error",
+        detail: error?.response?.data?.message ?? "Failed to load vendors",
+        life: 3000,
+      });
+    } finally {
+      if (requestId === vendorsRequestId.current) setLoading(false);
+    }
+  }, [page, rows, debouncedSearch, statusFilter]);
+
+  // ── Load counts — ONE API call, fetched once on mount ─
+  // Refresh only after actions that change counts (suspend/reactivate)
+  const loadCounts = useCallback(async () => {
+    try {
+      setCountsLoading(true);
+      const data = await getUserCounts("vendor");
+      setCounts({
+        total: data.total,
+        active: data.active,
+        inactive: data.inactive,
+        suspended: data.suspended,
+        pending: data.pending,
+      });
+    } catch (error) {
+      console.error("Failed to load vendor counts:", error);
+    } finally {
+      setCountsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, statusFilter]);
+
+  useEffect(() => {
+    loadVendors();
+  }, [loadVendors]);
+
+  useEffect(() => {
+    if (countsFetchedOnce.current) return;
+    countsFetchedOnce.current = true;
+    loadCounts();
+  }, [loadCounts]);
+
+  const handleView = (v: Vendor) => {
+    setSelectedVendor(v);
+    setViewDialogVisible(true);
   };
-
-  const handleView = (v: Vendor) => { setSelectedVendor(v); setViewDialogVisible(true); };
 
   const handleEdit = (v: Vendor) => {
-    setEditingVendor({ ...v });
-    setIsEditing(true);
+    setSelectedVendor(v);
+    setEditingVendor({
+      firstName: v.firstName,
+      lastName: v.lastName,
+      email: v.email,
+      status: v.status,
+    });
     setFormDialogVisible(true);
   };
 
-  const handleCreate = () => {
-    setEditingVendor({ ...emptyVendor });
-    setIsEditing(false);
-    setFormDialogVisible(true);
-  };
-
-  const handleDelete = (v: Vendor) => {
+  const handleSuspend = (v: Vendor) => {
     confirmDialog({
-      message: `Suspend vendor "${v.vendorName}"? They will no longer be able to submit ASNs.`,
+      message: `Suspend ${v.firstName} ${v.lastName}? They will no longer be able to submit ASNs.`,
       header: "Confirm Suspension",
       icon: "pi pi-exclamation-triangle",
       acceptClassName: "p-button-danger",
-      accept: () => {
-        setVendors((prev) => prev.map((vendor) => vendor.id === v.id ? { ...vendor, status: "Suspended" } : vendor));
-        toast.current?.show({ severity: "warn", summary: "Suspended", detail: `${v.vendorName} has been suspended.`, life: 3000 });
-      },
+      accept: () => submitSuspend(v),
     });
   };
 
-  const handleSave = () => {
-    if (!editingVendor.vendorName || !editingVendor.vendorCode) {
-      toast.current?.show({ severity: "error", summary: "Validation", detail: "Vendor Code and Name are required.", life: 3000 });
-      return;
+  const submitSuspend = async (v: Vendor) => {
+    try {
+      setActionLoading(true);
+      await suspendUser(v.id);
+
+      setVendors((prev) =>
+        prev.map((vendor) =>
+          vendor.id === v.id
+            ? { ...vendor, status: "suspended" as UserStatus }
+            : vendor,
+        ),
+      );
+
+      // Update counts locally instead of re-fetching
+      setCounts((c) => ({
+        ...c,
+        active: Math.max(0, c.active - (v.status === "active" ? 1 : 0)),
+        suspended: c.suspended + 1,
+      }));
+
+      toast.current?.show({
+        severity: "warn",
+        summary: "Suspended",
+        detail: `${v.firstName} ${v.lastName} has been suspended.`,
+        life: 3000,
+      });
+    } catch (error: any) {
+      toast.current?.show({
+        severity: "error",
+        summary: "Error",
+        detail: error?.response?.data?.message ?? "Failed to suspend vendor",
+        life: 3000,
+      });
+    } finally {
+      setActionLoading(false);
     }
-    if (isEditing) {
-      setVendors((prev) => prev.map((v) => v.id === editingVendor.id ? { ...v, ...editingVendor } as Vendor : v));
-      toast.current?.show({ severity: "success", summary: "Updated", detail: `${editingVendor.vendorName} updated.`, life: 3000 });
-    } else {
-      const newVendor: Vendor = { ...emptyVendor, ...editingVendor, id: Date.now() } as Vendor;
-      setVendors((prev) => [newVendor, ...prev]);
-      toast.current?.show({ severity: "success", summary: "Created", detail: `${newVendor.vendorName} added.`, life: 3000 });
-    }
-    setFormDialogVisible(false);
   };
 
-  const set = (field: keyof Vendor, value: any) =>
+  const handleReactivate = (v: Vendor) => {
+    confirmDialog({
+      message: `Reactivate ${v.firstName} ${v.lastName}?`,
+      header: "Confirm Reactivation",
+      icon: "pi pi-check-circle",
+      acceptClassName: "p-button-success",
+      accept: () => submitReactivate(v),
+    });
+  };
+
+  const submitReactivate = async (v: Vendor) => {
+    try {
+      setActionLoading(true);
+      await activateUser(v.id);
+
+      setVendors((prev) =>
+        prev.map((vendor) =>
+          vendor.id === v.id
+            ? { ...vendor, status: "active" as UserStatus }
+            : vendor,
+        ),
+      );
+
+      setCounts((c) => ({
+        ...c,
+        active: c.active + 1,
+        suspended: Math.max(
+          0,
+          c.suspended - (v.status === "suspended" ? 1 : 0),
+        ),
+      }));
+
+      toast.current?.show({
+        severity: "success",
+        summary: "Activated",
+        detail: `${v.firstName} ${v.lastName} has been reactivated.`,
+        life: 3000,
+      });
+    } catch (error: any) {
+      toast.current?.show({
+        severity: "error",
+        summary: "Error",
+        detail: error?.response?.data?.message ?? "Failed to reactivate vendor",
+        life: 3000,
+      });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleResendVerification = async (v: Vendor) => {
+    try {
+      setActionLoading(true);
+      await resendVerification(v.email);
+      toast.current?.show({
+        severity: "info",
+        summary: "Sent",
+        detail: `Verification email resent to ${v.email}.`,
+        life: 3000,
+      });
+    } catch (error: any) {
+      toast.current?.show({
+        severity: "error",
+        summary: "Error",
+        detail:
+          error?.response?.data?.message ?? "Failed to resend verification",
+        life: 3000,
+      });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!editingVendor.firstName?.trim() || !editingVendor.lastName?.trim()) {
+      toast.current?.show({
+        severity: "error",
+        summary: "Validation",
+        detail: "First name and last name are required.",
+        life: 3000,
+      });
+      return;
+    }
+
+    if (!selectedVendor) return;
+
+    try {
+      setActionLoading(true);
+      const updated = await updateUser(selectedVendor.id, editingVendor);
+
+      setVendors((prev) =>
+        prev.map((v) =>
+          v.id === selectedVendor.id ? { ...v, ...updated } : v,
+        ),
+      );
+
+      toast.current?.show({
+        severity: "success",
+        summary: "Updated",
+        detail: `${editingVendor.firstName} ${editingVendor.lastName} updated.`,
+        life: 3000,
+      });
+      setFormDialogVisible(false);
+    } catch (error: any) {
+      toast.current?.show({
+        severity: "error",
+        summary: "Error",
+        detail: error?.response?.data?.message ?? "Failed to update vendor",
+        life: 3000,
+      });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const set = (field: keyof EditableVendorFields, value: any) =>
     setEditingVendor((prev) => ({ ...prev, [field]: value }));
 
   return (
@@ -148,141 +348,282 @@ export default function AdminVendorManagementPage() {
       <Toast ref={toast} />
       <ConfirmDialog />
 
-      {/* HEADER */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Vendor Management</h1>
-          <p className="text-sm text-muted-foreground mt-1">Add, edit, and manage vendor accounts</p>
-        </div>
-        <Button label="Add Vendor" icon="pi pi-plus" onClick={handleCreate} />
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">
+          Vendor Management
+        </h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Vendor accounts are auto-provisioned from SAP purchase order sync.
+        </p>
       </div>
 
-      {/* KPI CARDS */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         {[
-          { label: "Total Vendors", value: counts.total, color: "text-foreground" },
+          {
+            label: "Total Vendors",
+            value: counts.total,
+            color: "text-foreground",
+          },
           { label: "Active", value: counts.active, color: "text-success" },
-          { label: "Inactive", value: counts.inactive, color: "text-muted-foreground" },
+          {
+            label: "Inactive",
+            value: counts.inactive,
+            color: "text-muted-foreground",
+          },
           { label: "Suspended", value: counts.suspended, color: "text-danger" },
+          { label: "Pending", value: counts.pending, color: "text-warning" },
         ].map((c) => (
           <div key={c.label} className="card p-5">
             <p className="text-sm text-muted-foreground">{c.label}</p>
-            <h3 className={`text-2xl font-bold mt-2 ${c.color}`}>{c.value}</h3>
+            <h3 className={`text-2xl font-bold mt-2 ${c.color}`}>
+              {countsLoading ? "—" : c.value}
+            </h3>
           </div>
         ))}
       </div>
 
-      {/* FILTERS */}
       <div className="flex flex-wrap items-center gap-3">
-        <Dropdown value={categoryFilter} options={[{ label: "All Categories", value: null }, ...categoryOptions]} onChange={(e) => setCategoryFilter(e.value)} placeholder="All Categories" className="w-48" />
-        <Dropdown value={statusFilter} options={[{ label: "All Status", value: null }, ...statusOptions]} onChange={(e) => setStatusFilter(e.value)} placeholder="All Status" className="w-40" />
-        {(categoryFilter || statusFilter) && (
-          <Button label="Clear" text icon="pi pi-times" onClick={() => { setCategoryFilter(null); setStatusFilter(null); }} />
+        <Dropdown
+          value={statusFilter}
+          options={[ ...STATUS_OPTIONS]}
+          onChange={(e) => setStatusFilter(e.value)}
+          placeholder="All Status"
+          className="w-56"
+        />
+        {statusFilter && (
+          <Button
+            label="Clear"
+            text
+            icon="pi pi-times"
+            onClick={() => setStatusFilter(null)}
+          />
         )}
       </div>
 
-      {/* TABLE */}
       <AppTable
-        data={filtered}
-        globalSearch
+        data={vendors}
+        loading={loading}
         onView={handleView}
         onEdit={handleEdit}
-        onDelete={handleDelete}
+        totalRecords={totalRecords}
+        rows={rows}
+        onPageChange={(e: any) => {
+          setPage(e.page + 1);
+          setRows(e.rows);
+        }}
+        onSearchChange={setSearch}
         columns={[
-          { field: "vendorCode", header: "Code", sortable: true, filter: true },
-          { field: "vendorName", header: "Vendor Name", sortable: true, filter: true },
-          { field: "contactPerson", header: "Contact", sortable: true },
-          { field: "email", header: "Email" },
-          { field: "city", header: "City", sortable: true },
-          { field: "category", header: "Category", sortable: true, filter: true },
-          { field: "totalOrders", header: "Orders", sortable: true },
-          { field: "onTimeDelivery", header: "On-Time", sortable: true },
-          { field: "status", header: "Status", sortable: true, filter: true },
+          { field: "id", header: "ID", sortable: true },
+          {
+            field: "firstName",
+            header: "Name",
+            sortable: true,
+            body: (row: Vendor) => `${row.firstName} ${row.lastName}`,
+          },
+          { field: "email", header: "Email", sortable: true, filter: true },
+          {
+            field: "sapVendorId",
+            header: "SAP Vendor ID",
+            sortable: true,
+            filter: true,
+          },
+          {
+            field: "status",
+            header: "Status",
+            sortable: true,
+            filter: true,
+            body: (row: Vendor) => {
+              const badge = STATUS_BADGE[row.status];
+              return (
+                <span
+                  className={`text-xs font-medium px-2 py-1 rounded-full ${badge.className}`}
+                >
+                  {badge.label}
+                </span>
+              );
+            },
+          },
+          {
+            field: "isEmailVerified",
+            header: "Email Verified",
+            body: (row: Vendor) =>
+              row.isEmailVerified ? "Verified" : "Unverified",
+          },
+          {
+            field: "lastLoginAt",
+            header: "Last Login",
+            sortable: true,
+            body: (row: Vendor) =>
+              row.lastLoginAt
+                ? new Date(row.lastLoginAt).toLocaleString()
+                : "Never",
+          },
+          // {
+          //   field:  "actions",
+          //   header: "Actions",
+          //   body: (row: Vendor) => (
+          //     <div className="flex gap-2">
+          //       {row.status === "active" && (
+          //         <Button icon="pi pi-ban" severity="danger" size="small" text tooltip="Suspend" onClick={() => handleSuspend(row)} />
+          //       )}
+          //       {row.status === "suspended" && (
+          //         <Button icon="pi pi-check-circle" severity="success" size="small" text tooltip="Reactivate" onClick={() => handleReactivate(row)} />
+          //       )}
+          //       {!row.isEmailVerified && (
+          //         <Button icon="pi pi-envelope" severity="info" size="small" text tooltip="Resend Verification" onClick={() => handleResendVerification(row)} />
+          //       )}
+          //     </div>
+          //   ),
+          // },
         ]}
       />
 
-      {/* VIEW DIALOG */}
-      <Dialog header={selectedVendor?.vendorName} visible={viewDialogVisible} onHide={() => setViewDialogVisible(false)} style={{ width: "560px" }} modal>
+      <Dialog
+        header={
+          selectedVendor
+            ? `${selectedVendor.firstName} ${selectedVendor.lastName}`
+            : ""
+        }
+        visible={viewDialogVisible}
+        onHide={() => setViewDialogVisible(false)}
+        style={{ width: "520px" }}
+        modal
+      >
         {selectedVendor && (
           <div className="space-y-4 pt-2">
             <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
               {[
-                { label: "Vendor Code", value: selectedVendor.vendorCode },
-                { label: "Category", value: selectedVendor.category },
-                { label: "Contact Person", value: selectedVendor.contactPerson },
+                { label: "First Name", value: selectedVendor.firstName },
+                { label: "Last Name", value: selectedVendor.lastName },
                 { label: "Email", value: selectedVendor.email },
-                { label: "Phone", value: selectedVendor.phone },
-                { label: "GSTIN", value: selectedVendor.gstin },
-                { label: "Address", value: selectedVendor.address },
-                { label: "City / State", value: `${selectedVendor.city}, ${selectedVendor.state}` },
-                { label: "Country", value: selectedVendor.country },
-                { label: "Pincode", value: selectedVendor.pincode },
-                { label: "Total Orders", value: selectedVendor.totalOrders },
-                { label: "On-Time Delivery", value: selectedVendor.onTimeDelivery },
-                { label: "Joined Date", value: selectedVendor.joinedDate },
-                { label: "Status", value: selectedVendor.status },
+                {
+                  label: "SAP Vendor ID",
+                  value: selectedVendor.sapVendorId ?? "—",
+                },
+                {
+                  label: "Status",
+                  value: STATUS_BADGE[selectedVendor.status]?.label,
+                },
+                {
+                  label: "Email Verified",
+                  value: selectedVendor.isEmailVerified ? "Yes" : "No",
+                },
+                {
+                  label: "First Login Done",
+                  value: selectedVendor.isFirstLoginVerified ? "Yes" : "No",
+                },
+                {
+                  label: "Last Login",
+                  value: selectedVendor.lastLoginAt
+                    ? new Date(selectedVendor.lastLoginAt).toLocaleString()
+                    : "Never",
+                },
+                {
+                  label: "Last Login IP",
+                  value: selectedVendor.lastLoginIp ?? "—",
+                },
+                {
+                  label: "Created At",
+                  value: new Date(
+                    selectedVendor.createdAt,
+                  ).toLocaleDateString(),
+                },
               ].map((f) => (
                 <div key={f.label}>
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">{f.label}</p>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                    {f.label}
+                  </p>
                   <p className="font-medium">{f.value}</p>
                 </div>
               ))}
             </div>
             <div className="flex justify-end gap-2 pt-2 border-t border-border">
-              <Button label="Close" outlined severity="secondary" onClick={() => setViewDialogVisible(false)} />
-              <Button label="Edit" icon="pi pi-pencil" onClick={() => { setViewDialogVisible(false); handleEdit(selectedVendor); }} />
+              <Button
+                label="Close"
+                outlined
+                severity="secondary"
+                onClick={() => setViewDialogVisible(false)}
+              />
+              <Button
+                label="Edit"
+                icon="pi pi-pencil"
+                onClick={() => {
+                  setViewDialogVisible(false);
+                  handleEdit(selectedVendor);
+                }}
+              />
             </div>
           </div>
         )}
       </Dialog>
 
-      {/* ADD / EDIT DIALOG */}
-      <Dialog header={isEditing ? `Edit – ${editingVendor.vendorName}` : "Add New Vendor"} visible={formDialogVisible} onHide={() => setFormDialogVisible(false)} style={{ width: "620px" }} modal>
+      <Dialog
+        header={`Edit — ${editingVendor.firstName ?? ""} ${editingVendor.lastName ?? ""}`}
+        visible={formDialogVisible}
+        onHide={() => setFormDialogVisible(false)}
+        style={{ width: "480px" }}
+        modal
+      >
         <div className="space-y-4 pt-2">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {(
-              [
-                { label: "Vendor Code *", field: "vendorCode", placeholder: "e.g. VND007" },
-                { label: "Vendor Name *", field: "vendorName", placeholder: "e.g. Pharma Co" },
-                { label: "Contact Person", field: "contactPerson", placeholder: "Full name" },
-                { label: "Email", field: "email", placeholder: "contact@vendor.com" },
-                { label: "Phone", field: "phone", placeholder: "+91 ..." },
-                { label: "GSTIN", field: "gstin", placeholder: "15-char GSTIN" },
-                { label: "Address", field: "address", placeholder: "Street / Plot" },
-                { label: "City", field: "city", placeholder: "City" },
-                { label: "State", field: "state", placeholder: "State" },
-                { label: "Pincode", field: "pincode", placeholder: "Pincode" },
-              ] as { label: string; field: keyof Vendor; placeholder: string }[]
-            ).map((f) => (
-              <div key={f.field} className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-foreground">{f.label}</label>
-                <InputText
-                  value={(editingVendor as any)[f.field] ?? ""}
-                  onChange={(e) => set(f.field, e.target.value)}
-                  placeholder={f.placeholder}
-                />
-              </div>
-            ))}
-
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-foreground">Country</label>
-              <Dropdown value={editingVendor.country} options={countryOptions} onChange={(e) => set("country", e.value)} placeholder="Select country" />
+              <label className="text-sm font-medium text-foreground">
+                First Name *
+              </label>
+              <InputText
+                value={editingVendor.firstName ?? ""}
+                onChange={(e) => set("firstName", e.target.value)}
+                placeholder="First name"
+              />
             </div>
-
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-foreground">Category</label>
-              <Dropdown value={editingVendor.category} options={categoryOptions} onChange={(e) => set("category", e.value)} placeholder="Select category" />
+              <label className="text-sm font-medium text-foreground">
+                Last Name *
+              </label>
+              <InputText
+                value={editingVendor.lastName ?? ""}
+                onChange={(e) => set("lastName", e.target.value)}
+                placeholder="Last name"
+              />
             </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-foreground">Status</label>
-              <Dropdown value={editingVendor.status} options={statusOptions} onChange={(e) => set("status", e.value)} />
+            <div className="flex flex-col gap-1.5 md:col-span-2">
+              <label className="text-sm font-medium text-foreground">
+                Email *
+              </label>
+              <InputText
+                value={editingVendor.email ?? ""}
+                onChange={(e) => set("email", e.target.value)}
+                placeholder="vendor@example.com"
+              />
+              <p className="text-xs text-muted-foreground">
+                Changing this will require the vendor to re-verify their email.
+              </p>
+            </div>
+            <div className="flex flex-col gap-1.5 md:col-span-2">
+              <label className="text-sm font-medium text-foreground">
+                Status
+              </label>
+              <Dropdown
+                value={editingVendor.status}
+                options={STATUS_OPTIONS}
+                onChange={(e) => set("status", e.value)}
+              />
             </div>
           </div>
-
           <div className="flex justify-end gap-2 pt-2 border-t border-border">
-            <Button label="Cancel" outlined severity="secondary" onClick={() => setFormDialogVisible(false)} />
-            <Button label={isEditing ? "Update" : "Add Vendor"} icon="pi pi-check" onClick={handleSave} />
+            <Button
+              label="Cancel"
+              outlined
+              severity="secondary"
+              onClick={() => setFormDialogVisible(false)}
+              disabled={actionLoading}
+            />
+            <Button
+              label="Update"
+              icon="pi pi-check"
+              loading={actionLoading}
+              onClick={handleSave}
+            />
           </div>
         </div>
       </Dialog>

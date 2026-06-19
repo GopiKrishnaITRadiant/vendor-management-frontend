@@ -86,8 +86,6 @@ export default function AppTable<T extends { id: number | string }>({
     return filters;
   }, [columns]);
 
-  const [filters, setFilters] = useState(initialFilters);
-
   const [globalFilterValue, setGlobalFilterValue] = useState("");
 
   const onGlobalFilterChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -95,7 +93,7 @@ export default function AppTable<T extends { id: number | string }>({
 
     setGlobalFilterValue(value);
 
-    onSearchChange?.(value); // 🔥 send to parent
+    onSearchChange?.(value);
   };
 
   const hasActions = onView || onEdit || onDelete;
