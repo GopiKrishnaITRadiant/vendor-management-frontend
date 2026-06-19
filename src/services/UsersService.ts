@@ -55,3 +55,10 @@ export const getUserCounts = async (role?: string) => {
   return response.data.data;
 };
 
+export const setupVendor = async (
+  id: number,
+  data: { email: string; password: string },
+) => {
+  const response = await api.patch(`/users/${id}/setup-vendor`, data);
+  return response.data;
+};
