@@ -53,7 +53,7 @@ export default function AdminLayout() {
 
   const userMenuItems = [
     {
-      label: user?.name ?? "Admin",
+      label: user?.fullName ?? "Admin",
       items: [
         { label: "Profile", icon: "pi pi-user", command: () => {} },
         { label: "Settings", icon: "pi pi-cog", command: () => {} },
@@ -143,17 +143,17 @@ export default function AdminLayout() {
           {sidebarOpen && (
             <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg">
               <Avatar
-                label={user?.name?.charAt(0).toUpperCase()}
+                label={user?.fullName?.charAt(0).toUpperCase()}
                 size="normal"
                 shape="circle"
                 className="bg-primary text-white shrink-0"
               />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-foreground truncate leading-tight">
-                  {user?.name}
+                  {user?.fullName}
                 </p>
                 <p className="text-xs text-muted-foreground leading-tight capitalize">
-                  {user?.role}
+                  {user?.role?.name}
                 </p>
               </div>
             </div>
@@ -207,17 +207,17 @@ export default function AdminLayout() {
               className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-muted transition-colors"
             >
               <Avatar
-                label={user?.name?.charAt(0).toUpperCase()}
+                label={user?.fullName?.charAt(0).toUpperCase()}
                 size="normal"
                 shape="circle"
                 className="bg-primary text-white"
               />
               <div className="text-left hidden md:block">
                 <p className="text-sm font-medium text-foreground leading-tight">
-                  {user?.name}
+                  {user?.fullName}
                 </p>
                 <p className="text-xs text-muted-foreground leading-tight capitalize">
-                  {user?.role}
+                  {user?.role?.name}
                 </p>
               </div>
               <i className="pi pi-chevron-down text-xs text-muted-foreground" />

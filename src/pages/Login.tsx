@@ -5,15 +5,19 @@ import { ArrowRightIcon } from "../components/icons/ArrowRightIcon";
 import { ShieldIcon } from "../components/icons/ShieldIcon";
 import { BuildingIcon } from "../components/icons/BuildingIcon";
 import { InputOtp } from "primereact/inputotp";
+import { useAuth, getRoleHomeRoute } from "../context/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 interface FormState {
   email: string;
   otp: string;
+  password: string;
 }
 
 interface FormErrors {
   email?: string;
   otp?: string;
+  password?: string;
 }
 
 export type ColumnType<T> = {
@@ -82,19 +86,23 @@ function LeftPanel() {
 }
 
 export default function Login() {
+  const auth = useAuth();
+  const navigate = useNavigate();
+
   const [form, setForm] = useState<FormState>({
     email: "",
     otp: "",
+    password: "",
   });
+  const [otpToken, setOtpToken] = useState("");
 
-  const [step, setStep] = useState<"EMAIL" | "OTP">("EMAIL");
+  // EMAIL -> OTP -> PASSWORD -> (dashboard via navigate)
+  const [step, setStep] = useState<"EMAIL" | "OTP" | "PASSWORD">("EMAIL");
 
-  const [errors, setErrors] = useState<{
-    email?: string;
-    otp?: string;
-  }>({});
+  const [errors, setErrors] = useState<FormErrors>({});
 
   const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const validateEmail = () => {
     if (!form.email.trim()) {
@@ -122,6 +130,16 @@ export default function Login() {
     return {};
   };
 
+  const validatePassword = () => {
+    if (!form.password) {
+      return {
+        password: "Password is required",
+      };
+    }
+
+    return {};
+  };
+
   const handleSendOtp = async () => {
     const validation = validateEmail();
 
@@ -130,14 +148,15 @@ export default function Login() {
       return;
     }
 
+    setFormError(null);
     setLoading(true);
 
     try {
-      // await api.sendOtp(form.email);
-
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
+      const data = await auth.sendOtp(form.email);
+      setOtpToken(data.data.otpToken);
       setStep("OTP");
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Could not send OTP");
     } finally {
       setLoading(false);
     }
@@ -151,17 +170,50 @@ export default function Login() {
       return;
     }
 
+    setFormError(null);
     setLoading(true);
 
     try {
-      // await api.verifyOtp({
-      //   email: form.email,
-      //   otp: form.otp,
-      // });
+      // Confirms the OTP only — does not log the user in.
+      await auth.verifyOtp(otpToken, form.otp);
+      setStep("PASSWORD");
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Invalid or expired OTP");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+  const handleLoginWithPassword = async () => {
+    const validation = validatePassword();
 
-      console.log("Login Success");
+    if (Object.keys(validation).length) {
+      setErrors(validation);
+      return;
+    }
+
+    setFormError(null);
+    setLoading(true);
+
+    try {
+      // Identity already confirmed via OTP, so this should resolve
+      // directly to a session rather than asking for OTP again.
+      const result = await auth.login(form.email, form.password);
+      console.log('result', result);
+      
+      if (result.requiresOtp) {
+        // Defensive fallback — shouldn't normally happen since we
+        // just verified OTP, but handle it gracefully if the backend
+        // disagrees (e.g. OTP confirmation expired).
+        setOtpToken(result.otpToken);
+        setStep("OTP");
+        setFormError(result.message ?? "Please verify the OTP again");
+        return;
+      }
+
+      navigate(getRoleHomeRoute(result.user.role?.name));
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Invalid email or password");
     } finally {
       setLoading(false);
     }
@@ -197,6 +249,12 @@ export default function Login() {
             </p>
           </div>
 
+          {formError && (
+            <div className="mb-4 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
+              {formError}
+            </div>
+          )}
+
           {/* Form */}
           <form onSubmit={(e) => e.preventDefault()} className="space-y-5">
             {/* Email */}
@@ -214,7 +272,7 @@ export default function Login() {
                   type="email"
                   placeholder="vendor@company.com"
                   value={form.email}
-                  disabled={step === "OTP"}
+                  disabled={step !== "EMAIL"}
                   onChange={(e) =>
                     setForm((prev) => ({
                       ...prev,
@@ -240,7 +298,7 @@ export default function Login() {
                 <div className="flex justify-center">
                   <InputOtp
                     value={form.otp}
-                    onChange={(e:any) =>
+                    onChange={(e: any) =>
                       setForm((prev) => ({
                         ...prev,
                         otp: e.value ?? "",
@@ -263,6 +321,8 @@ export default function Login() {
 
                 <button
                   type="button"
+                  onClick={handleSendOtp}
+                  disabled={loading}
                   className="mt-2 w-full text-primary text-sm"
                 >
                   Resend OTP
@@ -270,22 +330,44 @@ export default function Login() {
               </div>
             )}
 
+            {/* Password — shown after OTP is verified */}
+            {step === "PASSWORD" && (
+              <div>
+                <label className="block mb-2 text-sm font-medium text-foreground">
+                  Password
+                </label>
+
+                <input
+                  type="password"
+                  placeholder="Enter your password"
+                  value={form.password}
+                  autoFocus
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      password: e.target.value,
+                    }))
+                  }
+                  className="w-full h-11 px-4 rounded-md border border-border"
+                />
+
+                {errors.password && (
+                  <p className="mt-1 text-xs text-danger">{errors.password}</p>
+                )}
+
+                <p className="text-xs text-center text-muted-foreground mt-3">
+                  Verified as {form.email}
+                </p>
+              </div>
+            )}
+
             {/* Button */}
-            {step === "EMAIL" ? (
+            {step === "EMAIL" && (
               <button
                 type="button"
                 onClick={handleSendOtp}
                 disabled={loading}
-                className="
-        w-full
-        h-11
-        rounded-md
-        bg-primary
-        text-primary-foreground
-        font-medium
-        flex-center
-        gap-2
-      "
+                className="w-full h-11 rounded-md bg-primary text-primary-foreground font-medium flex-center gap-2"
               >
                 {loading ? (
                   "Sending OTP..."
@@ -296,27 +378,38 @@ export default function Login() {
                   </>
                 )}
               </button>
-            ) : (
+            )}
+
+            {step === "OTP" && (
               <button
                 type="button"
                 onClick={handleVerifyOtp}
                 disabled={loading}
-                className="
-        w-full
-        h-11
-        rounded-md
-        bg-primary
-        text-primary-foreground
-        font-medium
-        flex-center
-        gap-2
-      "
+                className="w-full h-11 rounded-md bg-primary text-primary-foreground font-medium flex-center gap-2"
               >
                 {loading ? (
                   "Verifying..."
                 ) : (
                   <>
-                    Verify & Login
+                    Verify OTP
+                    <ArrowRightIcon />
+                  </>
+                )}
+              </button>
+            )}
+
+            {step === "PASSWORD" && (
+              <button
+                type="button"
+                onClick={handleLoginWithPassword}
+                disabled={loading}
+                className="w-full h-11 rounded-md bg-primary text-primary-foreground font-medium flex-center gap-2"
+              >
+                {loading ? (
+                  "Signing in..."
+                ) : (
+                  <>
+                    Sign In
                     <ArrowRightIcon />
                   </>
                 )}
