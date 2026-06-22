@@ -4,12 +4,14 @@ import api from "../api/api";
 export const getAllASNs = async (
   page:    number,
   limit:   number,
+  vendorNo?: string,
   search?: string,
   status?: string,
 ) => {
   const params = new URLSearchParams();
   params.set('page',  String(page));
   params.set('limit', String(limit));
+  if (vendorNo) params.set('vendorNo', vendorNo);
   if (search) params.set('search', search);
   if (status) params.set('status', status);
 

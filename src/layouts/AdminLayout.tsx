@@ -5,9 +5,9 @@ import { Badge } from "primereact/badge";
 import { Button } from "primereact/button";
 import { Menu } from "primereact/menu";
 import { useAuth } from "../context/AuthContext";
+import { useConfirmLogout } from "../hooks/UseConfirmLogout";
 
-// ─── Nav Items ───────────────────────────────────────────
-
+//Nav Items
 type NavItem = {
   label: string;
   icon: string;
@@ -50,18 +50,19 @@ export default function AdminLayout() {
   const navigate = useNavigate();
   const menuRef = useRef<Menu>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const confirmLogout = useConfirmLogout();
 
   const userMenuItems = [
     {
       label: user?.fullName ?? "Admin",
       items: [
-        { label: "Profile", icon: "pi pi-user", command: () => {} },
-        { label: "Settings", icon: "pi pi-cog", command: () => {} },
+        { label: "Profile", icon: "pi pi-user", command: () => navigate("/admin/profile") },
+        { label: "Settings", icon: "pi pi-cog", command: () => navigate("/admin/settings") },
         { separator: true },
         {
           label: "Logout",
           icon: "pi pi-sign-out",
-          command: () => { logout(); navigate("/"); },
+          command: () => confirmLogout,
         },
       ],
     },

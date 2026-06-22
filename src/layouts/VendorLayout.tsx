@@ -20,10 +20,10 @@ export default function VendorLayout() {
 
   const userMenuItems = [
     {
-      label: user?.name ?? "Account",
+      label: user?.fullName ?? "Account",
       items: [
-        { label: "Profile", icon: "pi pi-user", command: () => {} },
-        { label: "Settings", icon: "pi pi-cog", command: () => {} },
+        { label: "Profile", icon: "pi pi-user", command: () => navigate("/profile") },
+        { label: "Settings", icon: "pi pi-cog", command: () => navigate("/settings") },
         { separator: true },
         { label: "Logout", icon: "pi pi-sign-out", command: () => { logout(); navigate("/"); } },
       ],
@@ -65,7 +65,7 @@ export default function VendorLayout() {
         <div className="border-t border-border p-3 space-y-2">
           {sidebarOpen && (
             <div className="px-2 py-1.5">
-              <p className="text-xs font-medium text-foreground truncate">{user?.vendorCode}</p>
+              <p className="text-xs font-medium text-foreground truncate">{user?.id}</p>
               {/* <p className="text-xs text-muted-foreground">Cipla Procurement</p> */}
             </div>
           )}
@@ -93,10 +93,10 @@ export default function VendorLayout() {
               onClick={(e) => menuRef.current?.toggle(e)}
               className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-muted transition-colors"
             >
-              <Avatar label={user?.name?.charAt(0).toUpperCase()} size="normal" shape="circle" className="bg-primary text-white" />
+              <Avatar label={user?.fullName.charAt(0).toUpperCase()} size="normal" shape="circle" className="bg-primary text-white" />
               <div className="text-left hidden md:block">
-                <p className="text-sm font-medium text-foreground leading-tight">{user?.name}</p>
-                <p className="text-xs text-muted-foreground leading-tight">{user?.vendorCode}</p>
+                <p className="text-sm font-medium text-foreground leading-tight">{user?.fullName}</p>
+                <p className="text-xs text-muted-foreground leading-tight">{user?.id}</p>
               </div>
               <i className="pi pi-chevron-down text-xs text-muted-foreground" />
             </button>

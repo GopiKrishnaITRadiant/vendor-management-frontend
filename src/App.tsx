@@ -7,6 +7,8 @@ import VendorLayout from "./layouts/VendorLayout";
 import AdminLayout from "./layouts/AdminLayout";
 
 import LoginPage from "./pages/Login";
+import NotFound from "./pages/NotFound";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 import PurchaseOrdersPage from "./pages/vendor/PurchaseOrder";
 import CreateASNPage from "./pages/vendor/CreateAsn";
@@ -20,6 +22,9 @@ import AdminVendorManagementPage from "./pages/Admin/AdminVendorManagement";
 import AdminUsersRolesPage from "./pages/Admin/AdminUserRoles";
 
 import ProtectedRoute from "./routes/ProtectedRoutes";
+import AdminProfile from "./pages/Admin/AdminProfile";
+import AdminSettings from "./pages/Admin/AdminSettings";
+import { ConfirmDialog } from "primereact/confirmdialog";
 
 // ── Root redirect — waits for the silent /auth/refresh bootstrap ──
 function RootRedirect() {
@@ -46,18 +51,21 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path= "/not-found" element={<NotFound />} />
       <Route path="/" element={<RootRedirect />} />
 
       <Route element={<MainLayout />}>
         {/* role values match backend role.name exactly: 'vendor' | 'admin' | 'manager' */}
-        <Route element={<ProtectedRoute allowedRoles={["vendor"]} />}>
+        {/* <Route element={<ProtectedRoute allowedRoles={["vendor"]} />}> */}
           <Route element={<VendorLayout />}>
             <Route index path="/vendor-dashboard" element={<VendorDashboardPage />} />
             <Route path="/purchase-orders" element={<PurchaseOrdersPage />} />
             <Route path="/asn/create" element={<CreateASNPage />} />
             <Route path="/asn/history" element={<ASNHistoryPage />} />
+            <Route  path= "profile" element={ <AdminProfile /> }/>
+            <Route path= "settings" element={ <AdminSettings /> }/>
           </Route>
-        </Route>
+        {/* </Route> */}
 
         <Route element={<ProtectedRoute allowedRoles={["admin", "manager"]} />}>
           <Route path="/admin" element={<AdminLayout />}>
@@ -66,6 +74,8 @@ function AppRoutes() {
             <Route path="purchase-orders" element={<AdminPurchaseOrdersPage />} />
             <Route path="vendors" element={<AdminVendorManagementPage />} />
             <Route path="users" element={<AdminUsersRolesPage />} />
+            <Route  path= "profile" element={ <AdminProfile /> }/>
+            <Route path= "settings" element={ <AdminSettings /> }/>
           </Route>
         </Route>
       </Route>
@@ -79,7 +89,9 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppRoutes />
+        <ErrorBoundary>
+          <AppRoutes />
+        </ErrorBoundary>
       </AuthProvider>
     </BrowserRouter>
   );

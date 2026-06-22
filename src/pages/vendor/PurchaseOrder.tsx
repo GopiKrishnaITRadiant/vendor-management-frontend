@@ -1,32 +1,42 @@
-import { useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "primereact/button";
+import { Toast } from "primereact/toast";
 import AppTable from "../../components/table/DataTable";
+import { getPurchaseOrders, getPurchaseOrderSummary } from "../../services/PurchaseOrderService";
+import { useDebounce } from "../../hooks/DebounceHook";
+import { useAuth } from "../../context/AuthContext";
+import type { PurchaseOrder } from "../../types/purchaseOrderTypes";
 
 // ─── Types ───────────────────────────────────────────────
 
-export type PurchaseOrder = {
-  id: number;
-  poNumber: string;
-  itemNumber: string;
-  materialCode: string;
-  materialDescription: string;
-  orderQuantity: number;
-  ndcCode: string;
-  vendor: string;
-  company: string;
-  deliveryDate: string;
-  status: "Open" | "ASN Created" | "In Progress" | "Completed";
-};
+type StatusTab = PurchaseOrder["status"] | "All";
 
-// ─── Helpers ─────────────────────────────────────────────
+interface Stats {
+  totalPOLines: number;
+  open:         number;
+  inProgress:   number;
+  completed:    number;
+}
+
+// ─── Constants ───────────────────────────────────────────
 
 const STATUS_STYLE: Record<PurchaseOrder["status"], string> = {
-  Open: "bg-blue-50 text-blue-700",
-  "ASN Created": "bg-amber-50 text-amber-700",
-  "In Progress": "bg-purple-50 text-purple-700",
-  Completed: "bg-green-50 text-green-700",
+  Open:         "bg-blue-50 text-blue-700",
+  "ASN Created":"bg-amber-50 text-amber-700",
+  "In Progress":"bg-purple-50 text-purple-700",
+  Completed:    "bg-green-50 text-green-700",
 };
+
+const STATUS_TABS: { label: string; value: StatusTab }[] = [
+  { label: "All",         value: "All" },
+  { label: "Open",        value: "Open" },
+  { label: "ASN Created", value: "ASN Created" },
+  { label: "In Progress", value: "In Progress" },
+  { label: "Completed",   value: "Completed" },
+];
+
+// ─── Sub-components ──────────────────────────────────────
 
 function StatusBadge({ status }: { status: PurchaseOrder["status"] }) {
   return (
@@ -36,60 +46,132 @@ function StatusBadge({ status }: { status: PurchaseOrder["status"] }) {
   );
 }
 
-// ─── Mock Data ───────────────────────────────────────────
-
-const purchaseOrders: PurchaseOrder[] = [
-  { id: 1, poNumber: "PO10001", itemNumber: "10", materialCode: "MAT001", materialDescription: "Paracetamol 500mg", orderQuantity: 1000, ndcCode: "NDC001", vendor: "Exelan Pharma", company: "Cipla", deliveryDate: "2024-06-20", status: "ASN Created" },
-  { id: 2, poNumber: "PO10001", itemNumber: "20", materialCode: "MAT002", materialDescription: "Vitamin C Tablets", orderQuantity: 2000, ndcCode: "NDC002", vendor: "Exelan Pharma", company: "Cipla", deliveryDate: "2024-06-20", status: "ASN Created" },
-  { id: 3, poNumber: "PO10002", itemNumber: "30", materialCode: "MAT003", materialDescription: "Cough Syrup", orderQuantity: 1500, ndcCode: "NDC003", vendor: "Health Corp", company: "Cipla", deliveryDate: "2024-06-25", status: "In Progress" },
-  { id: 4, poNumber: "PO10003", itemNumber: "40", materialCode: "MAT004", materialDescription: "Antibiotic Capsules", orderQuantity: 2500, ndcCode: "NDC004", vendor: "Medi Supplies", company: "Cipla", deliveryDate: "2024-06-15", status: "Completed" },
-  { id: 5, poNumber: "PO10005", itemNumber: "10", materialCode: "MAT005", materialDescription: "Paracetamol 500mg", orderQuantity: 1000, ndcCode: "NDC001", vendor: "Exelan Pharma", company: "Cipla", deliveryDate: "2024-07-01", status: "Open" },
-  { id: 6, poNumber: "PO10006", itemNumber: "20", materialCode: "MAT006", materialDescription: "Vitamin C Tablets", orderQuantity: 2000, ndcCode: "NDC002", vendor: "Exelan Pharma", company: "Cipla", deliveryDate: "2024-07-05", status: "ASN Created" },
-  { id: 7, poNumber: "PO10007", itemNumber: "30", materialCode: "MAT007", materialDescription: "Cough Syrup", orderQuantity: 1500, ndcCode: "NDC007", vendor: "Health Corp", company: "Cipla", deliveryDate: "2024-07-10", status: "In Progress" },
-  { id: 8, poNumber: "PO10008", itemNumber: "40", materialCode: "MAT008", materialDescription: "Antibiotic Capsules", orderQuantity: 2500, ndcCode: "NDC004", vendor: "Medi Supplies", company: "Cipla", deliveryDate: "2024-06-30", status: "Open" },
-  { id: 9, poNumber: "PO10009", itemNumber: "10", materialCode: "MAT009", materialDescription: "Ibuprofen 400mg", orderQuantity: 3000, ndcCode: "NDC009", vendor: "Exelan Pharma", company: "Cipla", deliveryDate: "2024-07-01", status: "Open" },
-  { id: 10, poNumber: "PO10010", itemNumber: "20", materialCode: "MAT010", materialDescription: "Omeprazole 20mg", orderQuantity: 1200, ndcCode: "NDC010", vendor: "Health Corp", company: "Cipla", deliveryDate: "2024-07-15", status: "ASN Created" },
-  { id: 11, poNumber: "PO10011", itemNumber: "30", materialCode: "MAT011", materialDescription: "Metformin 500mg", orderQuantity: 5000, ndcCode: "NDC011", vendor: "Medi Supplies", company: "Cipla", deliveryDate: "2024-07-20", status: "Completed" },
-  { id: 12, poNumber: "PO10012", itemNumber: "40", materialCode: "MAT012", materialDescription: "Atorvastatin 10mg", orderQuantity: 800, ndcCode: "NDC012", vendor: "Exelan Pharma", company: "Cipla", deliveryDate: "2024-07-30", status: "Open" },
-];
-
-const STATUS_TABS: Array<{ label: string; value: PurchaseOrder["status"] | "All" }> = [
-  { label: "All", value: "All" },
-  { label: "Open", value: "Open" },
-  { label: "ASN Created", value: "ASN Created" },
-  { label: "In Progress", value: "In Progress" },
-  { label: "Completed", value: "Completed" },
-];
-
-// ─── Component ───────────────────────────────────────────
+// ─── Page ────────────────────────────────────────────────
 
 export default function PurchaseOrdersPage() {
   const navigate = useNavigate();
+  const toast    = useRef<Toast>(null);
+  const { user } = useAuth();
+
+  // ── Table state ───────────────────────────────────────
+  const [pos,          setPos]          = useState<PurchaseOrder[]>([]);
+  const [loading,      setLoading]      = useState(true);
+  const [page,         setPage]         = useState(1);
+  const [rows,         setRows]         = useState(10);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [search,       setSearch]       = useState("");
+  const debouncedSearch                 = useDebounce(search, 500);
+  const [activeStatus, setActiveStatus] = useState<StatusTab>("All");
   const [selectedOrders, setSelectedOrders] = useState<PurchaseOrder[]>([]);
-  const [activeStatus, setActiveStatus] = useState<PurchaseOrder["status"] | "All">("All");
+
+  // ── KPI stats ─────────────────────────────────────────
+  const [stats,        setStats]        = useState<Stats>({ totalPOLines: 0, open: 0, inProgress: 0, completed: 0 });
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  // ── Request guard ─────────────────────────────────────
+  const tableRequestId  = useRef(0);
+  const statsFetchedRef = useRef(false);
+
+  // ── Vendor number from the logged-in user ─────────────
+  const vendorNo = (user as any)?.sapVendorId ?? undefined;
+
+  // ── Load table data ───────────────────────────────────
+
+  const loadPurchaseOrders = useCallback(async () => {
+    const requestId = ++tableRequestId.current;
+
+    try {
+      setLoading(true);
+
+      const response = await getPurchaseOrders(
+        page,
+        rows,
+        debouncedSearch || undefined,
+        vendorNo,
+        activeStatus === "All" ? undefined : activeStatus,
+      );
+
+      if (requestId !== tableRequestId.current) return; // stale — ignore
+
+      setPos(response.data);
+      setTotalRecords(response.total);
+    } catch (error: any) {
+      if (requestId !== tableRequestId.current) return;
+      toast.current?.show({
+        severity: "error",
+        summary:  "Error",
+        detail:   error?.response?.data?.message ?? "Failed to load purchase orders",
+        life:     3000,
+      });
+    } finally {
+      if (requestId === tableRequestId.current) setLoading(false);
+    }
+  }, [page, rows, debouncedSearch, activeStatus, vendorNo]);
+
+  // ── Load KPI stats once on mount ──────────────────────
+
+  const loadStats = useCallback(async () => {
+    try {
+      setStatsLoading(true);
+      const data = await getPurchaseOrderSummary(vendorNo);
+      setStats({
+        totalPOLines: data.totalPOLines ?? 0,
+        open:         data.open         ?? 0,
+        inProgress:   (data.inProgress  ?? 0) + (data.asnCreated ?? 0),
+        completed:    data.completed    ?? 0,
+      });
+    } catch (error: any) {
+      console.error("Failed to load PO stats:", error);
+    } finally {
+      setStatsLoading(false);
+    }
+  }, [vendorNo]);
+
+  // ── Reset to page 1 when filter/search changes ────────
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, activeStatus]);
+
+  useEffect(() => {
+    loadPurchaseOrders();
+  }, [loadPurchaseOrders]);
+
+  useEffect(() => {
+    if (statsFetchedRef.current) return;
+    statsFetchedRef.current = true;
+    loadStats();
+  }, [loadStats]);
+
+  // ── Handlers ─────────────────────────────────────────
+
+  const handleStatusChange = (status: StatusTab) => {
+    setActiveStatus(status);
+    setSelectedOrders([]);
+  };
 
   const handleCreateASN = () => {
     if (!selectedOrders.length) return;
     navigate("/asn/create", { state: { selectedOrders } });
   };
 
-  const filteredOrders =
-    activeStatus === "All"
-      ? purchaseOrders
-      : purchaseOrders.filter((po) => po.status === activeStatus);
-
-  const counts = {
-    All: purchaseOrders.length,
-    Open: purchaseOrders.filter((p) => p.status === "Open").length,
-    "ASN Created": purchaseOrders.filter((p) => p.status === "ASN Created").length,
-    "In Progress": purchaseOrders.filter((p) => p.status === "In Progress").length,
-    Completed: purchaseOrders.filter((p) => p.status === "Completed").length,
+  const tabCount = (value: StatusTab) => {
+    if (statsLoading) return "—";
+    switch (value) {
+      case "All":         return stats.totalPOLines;
+      case "Open":        return stats.open;
+      case "In Progress": return stats.inProgress;
+      case "Completed":   return stats.completed;
+      default:            return 0;
+    }
   };
+
+  // ── Render ────────────────────────────────────────────
 
   return (
     <div className="page-container py-6 space-y-6">
+      <Toast ref={toast} />
 
-      {/* PAGE HEADER */}
+      {/* HEADER */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Purchase Orders</h1>
@@ -109,32 +191,22 @@ export default function PurchaseOrdersPage() {
             outlined
             onClick={() => navigate("/asn/history")}
           />
-          <Button
-            label="Create ASN"
-            icon="pi pi-plus"
-            disabled={selectedOrders.length === 0}
-            onClick={handleCreateASN}
-            tooltip={
-              selectedOrders.length === 0
-                ? "Select at least one order"
-                : `Create ASN for ${selectedOrders.length} order(s)`
-            }
-            tooltipOptions={{ position: "left" }}
-          />
         </div>
       </div>
 
       {/* KPI CARDS */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         {[
-          { label: "Total Orders", value: counts.All, color: "text-foreground" },
-          { label: "Open", value: counts.Open, color: "text-blue-600" },
-          { label: "In Progress", value: counts["In Progress"] + counts["ASN Created"], color: "text-amber-600" },
-          { label: "Completed", value: counts.Completed, color: "text-green-600" },
+          { label: "Total Orders", value: stats.totalPOLines, color: "text-foreground" },
+          { label: "Open",         value: stats.open,         color: "text-blue-600" },
+          { label: "In Progress",  value: stats.inProgress,   color: "text-amber-600" },
+          { label: "Completed",    value: stats.completed,    color: "text-green-600" },
         ].map((c) => (
           <div key={c.label} className="card p-5">
             <p className="text-sm text-muted-foreground">{c.label}</p>
-            <h3 className={`text-2xl font-bold mt-2 ${c.color}`}>{c.value}</h3>
+            <h3 className={`text-2xl font-bold mt-2 ${c.color}`}>
+              {statsLoading ? "—" : c.value}
+            </h3>
           </div>
         ))}
       </div>
@@ -147,10 +219,7 @@ export default function PurchaseOrdersPage() {
           {STATUS_TABS.map((tab) => (
             <button
               key={tab.value}
-              onClick={() => {
-                setActiveStatus(tab.value);
-                setSelectedOrders([]);
-              }}
+              onClick={() => handleStatusChange(tab.value)}
               className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                 activeStatus === tab.value
                   ? "border-primary text-primary"
@@ -158,14 +227,12 @@ export default function PurchaseOrdersPage() {
               }`}
             >
               {tab.label}
-              <span
-                className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${
-                  activeStatus === tab.value
-                    ? "bg-primary text-white"
-                    : "bg-muted text-muted-foreground"
-                }`}
-              >
-                {counts[tab.value]}
+              <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${
+                activeStatus === tab.value
+                  ? "bg-primary text-white"
+                  : "bg-muted text-muted-foreground"
+              }`}>
+                {tabCount(tab.value)}
               </span>
             </button>
           ))}
@@ -179,41 +246,49 @@ export default function PurchaseOrdersPage() {
               {selectedOrders.length} order{selectedOrders.length > 1 ? "s" : ""} selected
             </p>
             <div className="flex items-center gap-2">
-              <Button
-                label="Clear"
-                text
-                size="small"
-                severity="secondary"
-                onClick={() => setSelectedOrders([])}
-              />
-              <Button
-                label="Create ASN"
-                icon="pi pi-plus"
-                size="small"
-                onClick={handleCreateASN}
-              />
+              <Button label="Clear" text size="small" severity="secondary" onClick={() => setSelectedOrders([])} />
+              <Button label="Create ASN" icon="pi pi-plus" size="small" onClick={handleCreateASN} />
             </div>
           </div>
         )}
 
         <AppTable
-          data={filteredOrders}
+          data={pos}
+          loading={loading}
+          rows={rows}
+          totalRecords={totalRecords}
+          first={(page - 1) * rows}
           selectable
-          globalSearch
           onSelectionChange={setSelectedOrders}
+          onPageChange={(e) => {
+            setPage(e.page + 1);
+            setRows(e.rows);
+          }}
+          onSearchChange={(value) => {
+            setSearch(value);
+            setPage(1);
+          }}
           columns={[
-            { field: "poNumber", header: "PO Number", sortable: true, filter: true },
-            { field: "itemNumber", header: "Item #", sortable: true },
-            { field: "materialCode", header: "Material Code", sortable: true, filter: true },
-            { field: "materialDescription", header: "Description", sortable: true, filter: true },
-            { field: "orderQuantity", header: "Qty", sortable: true },
-            { field: "deliveryDate", header: "Delivery Date", sortable: true },
+            { field: "poNo",      header: "PO Number",     sortable: true, filter: true },
+            { field: "poItem",    header: "Item #",         sortable: true },
+            { field: "batch",     header: "Batch",          sortable: true, filter: true },
+            { field: "matCode",   header: "Material Code",  sortable: true, filter: true },
+            { field: "matDesc",   header: "Description",    sortable: true },
+            { field: "actQty",    header: "Quantity",       sortable: true },
+            { field: "vendorNo",  header: "Vendor No",      sortable: true },
+            { field: "soldTo",    header: "Sold To",        sortable: true },
+            { field: "incoterm1", header: "Incoterm 1",     sortable: true },
+            { field: "incoterm2", header: "Incoterm 2",     sortable: true },
+            { field: "createdAt", header: "Created Date",   sortable: true,
+              body: (row: PurchaseOrder) =>
+                row.createdAt ? new Date(row.createdAt).toLocaleDateString() : "—",
+            },
             {
               field: "status",
               header: "Status",
               sortable: true,
               filter: true,
-              body: (row) => <StatusBadge status={row.status} />,
+              body: (row: PurchaseOrder) => <StatusBadge status={row.status} />,
             },
           ]}
         />

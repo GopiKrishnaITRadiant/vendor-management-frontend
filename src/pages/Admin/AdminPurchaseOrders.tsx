@@ -1,41 +1,14 @@
 import { useRef, useState, useEffect } from "react";
 import { Button } from "primereact/button";
 import { Dialog } from "primereact/dialog";
-import { Dropdown } from "primereact/dropdown";
 import { Toast } from "primereact/toast";
-import { ConfirmDialog, confirmDialog } from "primereact/confirmdialog";
+import { ConfirmDialog } from "primereact/confirmdialog";
 import AppTable from "../../components/table/DataTable";
 import { getPurchaseOrders } from "../../services/PurchaseOrderService";
 import { getAdminDashboard } from "../../services/DashboardService";
 import { useDebounce } from "../../hooks/DebounceHook";
 import Loader from "../../components/Loader";
-
-type PurchaseOrder = {
-  id: number;
-  poNo: string;
-  poItem: string;
-  matCode: string;
-  matDesc: string;
-  actQty: number;
-  ndcCode: string;
-  vendorNo: string;
-  soldTo: string;
-
-  incoterm1: string | null;
-  incoterm2: string | null;
-  loadingGroup: string | null;
-  loekz: string | null;
-  poType: string | null;
-
-  odpoQuan: number;
-  sourceFileName: string;
-
-  createdAt: string;
-  updatedAt: string;
-
-  batch: string | null;
-  status: string;
-};
+import type { PurchaseOrder } from "../../types/purchaseOrderTypes";
 
 export default function AdminPurchaseOrdersPage() {
   const toast = useRef<Toast>(null);
@@ -119,7 +92,6 @@ export default function AdminPurchaseOrdersPage() {
   //   if (statusFilter && p.status !== statusFilter) return false;
   //   return true;
   // });
-  console.log('stats',stats);
 
   const handleView = (po: PurchaseOrder) => {
     setSelectedPO(po);

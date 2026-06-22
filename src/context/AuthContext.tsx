@@ -17,6 +17,7 @@ export type AuthUser = {
   fullName: string;
   email: string;
   role: { id: number; name: UserRole };
+  isTwoFactorEnabled: boolean;
 };
 
 type LoginResult =

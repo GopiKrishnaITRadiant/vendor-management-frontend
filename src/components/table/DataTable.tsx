@@ -1,11 +1,9 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import { Column } from "primereact/column";
 import { DataTable } from "primereact/datatable";
 import { Button } from "primereact/button";
 import { InputText } from "primereact/inputtext";
-
-import { FilterMatchMode } from "primereact/api";
 
 type ColumnType<T> = {
   field: keyof T;
@@ -65,26 +63,6 @@ export default function AppTable<T extends { id: number | string }>({
   onDelete,
 }: AppTableProps<T>) {
   const [selectedRows, setSelectedRows] = useState<any>(null);
-
-  const initialFilters = useMemo(() => {
-    const filters: any = {
-      global: {
-        value: null,
-        matchMode: FilterMatchMode.CONTAINS,
-      },
-    };
-
-    columns.forEach((column) => {
-      if (column.filter) {
-        filters[String(column.field)] = {
-          value: null,
-          matchMode: FilterMatchMode.CONTAINS,
-        };
-      }
-    });
-
-    return filters;
-  }, [columns]);
 
   const [globalFilterValue, setGlobalFilterValue] = useState("");
 
@@ -155,9 +133,6 @@ export default function AppTable<T extends { id: number | string }>({
         totalRecords={totalRecords || data.length}
         onPage={onPageChange}
         loading={loading}
-        // filters={filters}
-        // onFilter={(e) => setFilters(e.filters)}
-        // globalFilterFields={columns.map((c) => String(c.field))}
         header={header}
         selection={selectedRows}
         onSelectionChange={(e) => {
