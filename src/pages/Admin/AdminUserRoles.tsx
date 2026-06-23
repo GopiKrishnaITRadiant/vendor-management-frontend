@@ -332,7 +332,7 @@ export default function AdminUsersRolesPage() {
           firstName: editingUser.firstName,
           lastName:  editingUser.lastName,
           email:     editingUser.email,
-          roleId:    editingUser.roleId,
+          // roleId:    editingUser.roleId,
           status:    editingUser.status,
         });
 

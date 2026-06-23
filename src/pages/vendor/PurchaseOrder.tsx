@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "primereact/button";
 import { Toast } from "primereact/toast";
 import AppTable from "../../components/table/DataTable";
-import { getPurchaseOrders, getPurchaseOrderSummary } from "../../services/PurchaseOrderService";
+import { getPurchaseOrders, getPurchaseOrderSummary, getVendorPurchaseOrderSummary } from "../../services/PurchaseOrderService";
 import { useDebounce } from "../../hooks/DebounceHook";
 import { useAuth } from "../../context/AuthContext";
 import type { PurchaseOrder } from "../../types/purchaseOrderTypes";
@@ -73,7 +73,7 @@ export default function PurchaseOrdersPage() {
   const statsFetchedRef = useRef(false);
 
   // ── Vendor number from the logged-in user ─────────────
-  const vendorNo = (user as any)?.sapVendorId ?? undefined;
+  const vendorNo = (user as any)?.sapVendorId ?? user?.id;
 
   // ── Load table data ───────────────────────────────────
 
@@ -113,7 +113,7 @@ export default function PurchaseOrdersPage() {
   const loadStats = useCallback(async () => {
     try {
       setStatsLoading(true);
-      const data = await getPurchaseOrderSummary(vendorNo);
+      const data = await getVendorPurchaseOrderSummary(vendorNo);
       setStats({
         totalPOLines: data.totalPOLines ?? 0,
         open:         data.open         ?? 0,

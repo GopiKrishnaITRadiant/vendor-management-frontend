@@ -5,7 +5,7 @@ import { Button } from "primereact/button";
 import AppTable from "../../components/table/DataTable";
 import { ASNDetailDialog, StatusBadge } from "../../components/dialogs/AsnDetailDialog";
 
-import { getAllASNs } from "../../services/ASNService";
+import { getAllASNs, submitASN } from "../../services/ASNService";
 import { useAuth } from "../../context/AuthContext";
 import { useDebounce } from "../../hooks/DebounceHook";
 
@@ -133,6 +133,8 @@ export default function ASNHistoryPage() {
     [counts]
   );
 
+  
+
   const handleView = (asn: ASN) => {
     setSelectedASN(asn);
     setDialogVisible(true);
@@ -143,6 +145,17 @@ export default function ASNHistoryPage() {
 
     return new Date(value).toLocaleDateString();
   };
+
+  const handleSubmitDraft = async (asnId: number) => {
+  try {
+    await submitASN(asnId);
+    await loadAsns();
+
+    setDialogVisible(false);
+  } catch (error: any) {
+    console.log(error);
+  }
+};
 
   const formatDateTime = (value?: string | Date) => {
     if (!value) return "-";
@@ -229,7 +242,7 @@ export default function ASNHistoryPage() {
                     : "bg-muted"
                 }`}
               >
-                {counts[tab.value]}
+                {counts[tab.value as keyof typeof counts]}
               </span>
             </button>
           ))}
@@ -275,7 +288,7 @@ export default function ASNHistoryPage() {
               header: "Ship Date",
               sortable: true,
               body: (row: ASN) =>
-                formatDate(row.estimatedShipDate),
+                formatDate(row.estimatedShipDate as string),
             },
             {
               field: "soldTo",
@@ -292,7 +305,7 @@ export default function ASNHistoryPage() {
               header: "Submitted",
               sortable: true,
               body: (row: ASN) =>
-                formatDateTime(row.submittedAt),
+                formatDateTime(row.submittedAt as string),
             },
             {
               field: "status",
@@ -310,6 +323,7 @@ export default function ASNHistoryPage() {
         asn={selectedASN}
         visible={dialogVisible}
         onHide={() => setDialogVisible(false)}
+        onSubmitDraft={handleSubmitDraft}
       />
     </div>
   );

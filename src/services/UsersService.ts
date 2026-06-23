@@ -1,64 +1,184 @@
-import api from '../api/api';
+// services/userService.ts
 
-// GET /users?page=1&limit=10&search=&role=vendor&status=active
+import { apiFetch } from "../api/client";
+
+// GET /users?page=1&limit=10&search=&role=&status=
 export const getAllUsers = async (
-  page:    number,
-  limit:   number,
+  page: number,
+  limit: number,
   search?: string,
-  role?:   string,
+  role?: string,
   status?: string,
 ) => {
   const params = new URLSearchParams();
-  params.set('page',  String(page));
-  params.set('limit', String(limit));
-  console.log('role', role);
-  if (search) params.set('search', search);
-  if (role)   params.set('role',   role);
-  if (status) params.set('status', status);
 
-  console.log('params', params.toString());
+  params.set("page", String(page));
+  params.set("limit", String(limit));
 
-  const response = await api.get(`/users?${params.toString()}`);
-  return response.data.data;
+  if (search) params.set("search", search);
+  if (role) params.set("role", role);
+  if (status) params.set("status", status);
+
+  const res = await apiFetch(
+    `/users?${params.toString()}`
+  );
+
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(
+      data.message ?? "Failed to fetch users",
+    );
+  }
+
+  return data.data;
 };
 
-export const createUser = async (data: any) => {
-  const response = await api.post('/users/admin', data);
-  return response.data.data;
-}
+export const createUser = async (payload: any) => {
+  const res = await apiFetch("/users", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 
-export const updateUser = async (id: number, data: Partial<any>) => {
-  const response = await api.patch(`/users/${id}`, data);
-  return response.data.data;
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(
+      data.message ?? "Failed to create user",
+    );
+  }
+
+  return data.data;
 };
 
-// These map to status updates via PATCH /users/:id
+export const updateUser = async (
+  id: number,
+  payload: Partial<any>,
+) => {
+  const res = await apiFetch(`/users/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(
+      data.message ?? "Failed to update user",
+    );
+  }
+
+  return data.data;
+};
+
 export const suspendUser = async (id: number) => {
-  const response = await api.patch(`/users/${id}`, { status: 'suspended' });
-  return response.data.data;
+  return updateUser(id, {
+    status: "suspended",
+  });
 };
 
 export const activateUser = async (id: number) => {
-  const response = await api.patch(`/users/${id}`, { status: 'active' });
-  return response.data.data;
+  return updateUser(id, {
+    status: "active",
+  });
 };
 
-export const resendVerification = async (email: string) => {
-  const response = await api.post('/users/resend-verification', { email });
-  return response.data.data;
+export const resendVerification = async (
+  email: string,
+) => {
+  const res = await apiFetch(
+    "/users/resend-verification",
+    {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    },
+  );
+
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(
+      data.message ??
+        "Failed to resend verification email",
+    );
+  }
+
+  return data.data;
 };
 
-export const getUserCounts = async (role?: string) => {
+export const getUserCounts = async (
+  role?: string,
+) => {
   const params = new URLSearchParams();
-  if (role) params.set('role', role);
-  const response = await api.get(`/users/counts?${params.toString()}`);
-  return response.data.data;
+
+  if (role) {
+    params.set("role", role);
+  }
+
+  const query = params.toString();
+
+  const res = await apiFetch(
+    `/users/counts${query ? `?${query}` : ""}`,
+  );
+
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(
+      data.message ??
+        "Failed to fetch user counts",
+    );
+  }
+
+  return data.data;
 };
 
 export const setupVendor = async (
   id: number,
-  data: { email: string; password: string },
+  payload: {
+    email: string;
+    password: string;
+  },
 ) => {
-  const response = await api.patch(`/users/${id}/setup-vendor`, data);
-  return response.data;
+  const res = await apiFetch(
+    `/users/${id}/setup-vendor`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    },
+  );
+
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(
+      data.message ?? "Failed to setup vendor",
+    );
+  }
+
+  return data.data;
+};
+
+export interface UpdateTwoFactorResponse {
+  isTwoFactorEnabled: boolean;
+}
+
+export const updateTwoFactor = async (
+  enabled: boolean,
+): Promise<UpdateTwoFactorResponse> => {
+  const res = await apiFetch("/auth/2fa", {
+    method: "PATCH",
+    body: JSON.stringify({ enabled }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(
+      data.message ??
+        "Failed to update two-factor settings",
+    );
+  }
+
+  return data.data;
 };

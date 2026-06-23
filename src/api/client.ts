@@ -22,21 +22,31 @@ async function refreshAccessToken(): Promise<string | null> {
 
   refreshPromise = (async () => {
     try {
-      // refreshToken lives in an httpOnly cookie — browser sends it
-      // automatically via credentials: 'include'. We don't read or
-      // send it from JS at all.
       const res = await fetch(`${API_BASE}/auth/refresh`, {
         method: "POST",
         credentials: "include",
       });
 
-      if (!res.ok) throw new Error("refresh failed");
+      if (!res.ok) {
+        throw new Error("refresh failed");
+      }
 
-      const data = await res.json(); // { accessToken } — backend also rotates the cookie
-      hooks?.onRefreshed(data.accessToken, null); // user not returned by /refresh — keep existing
-      return data.accessToken as string;
-    } catch {
+      const response = await res.json();
+
+      const accessToken = response.data?.accessToken;
+
+      if (!accessToken) {
+        throw new Error("access token missing");
+      }
+
+      hooks?.onRefreshed(accessToken, null);
+
+      return accessToken;
+    } catch (error) {
+      console.error("Refresh failed:", error);
+
       hooks?.onAuthFailed();
+
       return null;
     } finally {
       refreshPromise = null;
@@ -50,7 +60,7 @@ async function refreshAccessToken(): Promise<string | null> {
 // Attaches access token, auto-retries once on 401 after refresh
 
 export async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
-  const token = hooks?.getAccessToken() as string;
+  const token = hooks?.getAccessToken() ?? null;
 
   const doFetch = (accessToken: string | null) =>
     fetch(`${API_BASE}${path}`, {

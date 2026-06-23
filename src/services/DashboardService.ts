@@ -1,20 +1,55 @@
-// services/dashboardService.ts
-import axios from "axios";
-
-const API_URL = "http://localhost:8000/api/v1";
+import { apiFetch } from "../api/client";
 
 export const getAdminDashboard = async () => {
-  const response = await axios.get(
-    `${API_URL}/dashboard/admin`
-  );
-  console.log('rets',response.data);
-  return response.data.data;
+  const res = await apiFetch("/dashboard/admin");
+
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(
+      data.message ?? "Failed to fetch admin dashboard",
+    );
+  }
+
+  return data.data;
 };
 
 export const getPOSummary = async () => {
-  const response = await axios.get(
-    `${API_URL}/dashboard/admin/po-summary`
+  const res = await apiFetch(
+    "/dashboard/admin/po-summary",
   );
 
-  return response.data;
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(
+      data.message ?? "Failed to fetch PO summary",
+    );
+  }
+
+  return data.data;
+};
+
+export const getVendorDashboard = async (
+  period: string,
+) => {
+  const params = new URLSearchParams();
+
+  if (period) {
+    params.set("period", period);
+  }
+
+  const res = await apiFetch(
+    `/dashboard/vendor?${params.toString()}`
+  );
+
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(
+      data.message ?? "Failed to fetch vendor dashboard",
+    );
+  }
+
+  return data.data;
 };

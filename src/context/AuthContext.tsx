@@ -14,7 +14,7 @@ export type UserRole = "vendor" | "admin" | "manager";
 
 export type AuthUser = {
   id: number;
-  fullName: string;
+  fullName?: string;
   email: string;
   role: { id: number; name: UserRole };
   isTwoFactorEnabled: boolean;
@@ -35,7 +35,6 @@ export const ROLE_HOME_ROUTE: Record<UserRole, string> = {
 };
 
 export function getRoleHomeRoute(role: UserRole | undefined | null): string {
-  debugger
   if (!role || !(role in ROLE_HOME_ROUTE)) return "/login";
   return ROLE_HOME_ROUTE[role];
 }
@@ -45,9 +44,13 @@ type AuthContextType = {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<LoginResult>;
-  sendOtp: (email: string) => Promise<{ data:{message: string; otpToken: string} }>;
+  sendOtp: (
+    email: string,
+  ) => Promise<{ data: { message: string; otpToken: string } }>;
   verifyOtp: (otpToken: string, otp: string) => Promise<void>;
-  resendOtp: (otpToken: string) => Promise<{ message: string; otpToken: string }>;
+  resendOtp: (
+    otpToken: string,
+  ) => Promise<{ message: string; otpToken: string }>;
   logout: () => Promise<void>;
 };
 
@@ -63,10 +66,13 @@ export function AuthProvider({ children }: { children: any }) {
     tokenRef.current = accessToken;
   }, [accessToken]);
 
-  const applySession = useCallback((newAccessToken: string, newUser: AuthUser) => {
-    setAccessTokenState(newAccessToken);
-    setUser(newUser);
-  }, []);
+  const applySession = useCallback(
+    (newAccessToken: string, newUser: AuthUser) => {
+      setAccessTokenState(newAccessToken);
+      setUser(newUser);
+    },
+    [],
+  );
 
   const clearSession = useCallback(() => {
     setAccessTokenState(null);
@@ -76,14 +82,19 @@ export function AuthProvider({ children }: { children: any }) {
   // Wire apiFetch's refresh hooks to current React state
   useEffect(() => {
     registerAuthHooks({
-      getAccessToken: () => tokenRef.current,
-      onRefreshed: (newAccessToken) => {
-        // /auth/refresh only returns { accessToken } — user is
-        // already in state from the original login, so we keep it.
-        setAccessTokenState(newAccessToken);
-      },
-      onAuthFailed: clearSession,
-    });
+  getAccessToken: () => tokenRef.current,
+
+  onRefreshed: (newAccessToken) => {
+    console.log("TOKEN REFRESHED", newAccessToken);
+    setAccessTokenState(newAccessToken);
+  },
+
+  onAuthFailed: () => {
+    console.log("AUTH FAILED - CLEARING SESSION");
+
+    clearSession();
+  },
+});
   }, [clearSession]);
 
   // On mount: try to mint an access token from the httpOnly
@@ -94,32 +105,55 @@ export function AuthProvider({ children }: { children: any }) {
 
     async function bootstrap() {
       try {
-        const res = await authApi.refresh();
-        if (!res.ok) throw new Error("no valid session");
+        const refreshRes = await authApi.refresh();
 
-        const data = await res.json(); // { accessToken }
+        if (!refreshRes.ok) {
+          throw new Error("No valid session");
+        }
 
-        // /auth/refresh doesn't return user — fetch it separately
+        const refreshJson = await refreshRes.json();
+
+        const accessToken = refreshJson.data.accessToken;
+
         const meRes = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL ?? "/api"}/users/me`,
+          `${import.meta.env.VITE_API_BASE_URL}/users/me`,
           {
-            headers: { Authorization: `Bearer ${data.accessToken}` },
-            credentials: "include",
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
           },
         );
 
-        if (!meRes.ok) throw new Error("failed to load user");
-        const me = await meRes.json();
+        if (!meRes.ok) {
+          throw new Error("Failed to load user");
+        }
 
-        if (!cancelled) applySession(data.accessToken, me);
-      } catch {
-        if (!cancelled) clearSession();
+        const meJson = await meRes.json();
+
+        console.log("refresh token", accessToken);
+        console.log("me response", meJson);
+
+        if (!cancelled) {
+          applySession(
+            accessToken,
+            meJson.data, // IMPORTANT
+          );
+        }
+      } catch (error) {
+        console.error(error);
+
+        if (!cancelled) {
+          clearSession();
+        }
       } finally {
-        if (!cancelled) setIsLoading(false);
+        if (!cancelled) {
+          setIsLoading(false);
+        }
       }
     }
 
     bootstrap();
+
     return () => {
       cancelled = true;
     };
@@ -128,42 +162,40 @@ export function AuthProvider({ children }: { children: any }) {
   // ── Step 1: email + password ──────────────────────────
 
   const login = useCallback(
-  async (email: string, password: string): Promise<LoginResult> => {
-    const res = await authApi.login(email, password);
+    async (email: string, password: string): Promise<LoginResult> => {
+      const res = await authApi.login(email, password);
 
-    const response = await res.json().catch(() => ({}));
+      const response = await res.json().catch(() => ({}));
 
-    if (!res.ok) {
-      throw new Error(
-        response.message ?? "Invalid email or password",
-      );
-    }
+      if (!res.ok) {
+        throw new Error(response.message ?? "Invalid email or password");
+      }
 
-    const data = response.data;
+      const data = response.data;
 
-    if (!data) {
-      throw new Error("Invalid server response");
-    }
+      if (!data) {
+        throw new Error("Invalid server response");
+      }
 
-    // OTP flow
-    if (data.requiresOtp) {
+      // OTP flow
+      if (data.requiresOtp) {
+        return {
+          requiresOtp: true,
+          otpToken: data.otpToken,
+          message: data.message,
+        };
+      }
+
+      // Login success
+      applySession(data.accessToken, data.user);
+
       return {
-        requiresOtp: true,
-        otpToken: data.otpToken,
-        message: data.message,
+        requiresOtp: false,
+        user: data.user,
       };
-    }
-
-    // Login success
-    applySession(data.accessToken, data.user);
-
-    return {
-      requiresOtp: false,
-      user: data.user,
-    };
-  },
-  [applySession],
-);
+    },
+    [applySession],
+  );
 
   // ── Step 2: verify OTP (first login only) ──────────────
   // This step only confirms the OTP is correct — it does NOT

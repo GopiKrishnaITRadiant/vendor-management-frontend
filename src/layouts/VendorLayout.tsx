@@ -4,11 +4,13 @@ import { Button } from "primereact/button";
 import { Avatar } from "primereact/avatar";
 import { Menu } from "primereact/menu";
 import { useAuth } from "../context/AuthContext";
+import ConfirmLogoutDialog from "../components/ConfirmLogoutDialog";
 
 const navItems = [
   { label: "Dashboard", icon: "pi pi-home", path: "/vendor-dashboard" },
   { label: "Purchase Orders", icon: "pi pi-file", path: "/purchase-orders" },
   { label: "Create ASN", icon: "pi pi-plus-circle", path: "/asn/create" },
+  // { label: "ASN List", icon: "pi pi-list", path: "/asn/list" },
   { label: "ASN History", icon: "pi pi-history", path: "/asn/history" },
 ];
 
@@ -17,6 +19,15 @@ export default function VendorLayout() {
   const navigate = useNavigate();
   const menuRef = useRef<Menu>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [logoutVisible, setLogoutVisible] = useState(false);
+
+  const handleLogout = async () => {
+    await logout();
+
+    setLogoutVisible(false);
+
+    navigate("/");
+  };
 
   const userMenuItems = [
     {
@@ -25,13 +36,24 @@ export default function VendorLayout() {
         { label: "Profile", icon: "pi pi-user", command: () => navigate("/profile") },
         { label: "Settings", icon: "pi pi-cog", command: () => navigate("/settings") },
         { separator: true },
-        { label: "Logout", icon: "pi pi-sign-out", command: () => { logout(); navigate("/"); } },
+        {
+          label:"Logout",
+          icon:"pi pi-sign-out",
+          command:()=>{
+            setLogoutVisible(true);
+          }
+        },
       ],
     },
   ];
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
+       <ConfirmLogoutDialog
+        visible={logoutVisible}
+        onHide={()=>setLogoutVisible(false)}
+        onConfirm={handleLogout}
+      />
 
       {/* SIDEBAR */}
       <aside className={`flex flex-col bg-card border-r border-border transition-all duration-300 shrink-0 ${sidebarOpen ? "w-56" : "w-16"}`}>
@@ -93,7 +115,7 @@ export default function VendorLayout() {
               onClick={(e) => menuRef.current?.toggle(e)}
               className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-muted transition-colors"
             >
-              <Avatar label={user?.fullName.charAt(0).toUpperCase()} size="normal" shape="circle" className="bg-primary text-white" />
+              <Avatar label={(user?.fullName||user?.email)?.charAt(0).toUpperCase()} size="normal" shape="circle" className="bg-primary text-white" />
               <div className="text-left hidden md:block">
                 <p className="text-sm font-medium text-foreground leading-tight">{user?.fullName}</p>
                 <p className="text-xs text-muted-foreground leading-tight">{user?.id}</p>

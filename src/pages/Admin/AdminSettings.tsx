@@ -4,39 +4,40 @@ import { InputSwitch } from "primereact/inputswitch";
 import { Toast } from "primereact/toast";
 import { useRef } from "react";
 import { useAuth } from "../../context/AuthContext";
-
-async function setTwoFactorEnabled(enabled: boolean): Promise<boolean> {
-  throw new Error(
-    "setTwoFactorEnabled is not wired up yet — replace this with your API call."
-  );
-}
-
-//Component
+import { updateTwoFactor } from "../../services/usersService";
 
 export default function AdminSettings() {
   const { user } = useAuth();
+  console.log('user', user);
   const navigate = useNavigate();
   const toast = useRef<Toast>(null);
 
   const [twoFactorEnabled, setTwoFactorEnabledState] = useState<boolean>(
-    !!user?.isTwoFactorEnabled
+    !!user?.isTwoFactorEnabled,
   );
   const [saving, setSaving] = useState(false);
 
   const handleToggle = async (next: boolean) => {
     const previous = twoFactorEnabled;
-    setTwoFactorEnabledState(next); // optimistic
+
+    setTwoFactorEnabledState(next);
     setSaving(true);
+
     try {
-      const confirmed = await setTwoFactorEnabled(next);
-      setTwoFactorEnabledState(confirmed);
+      const response = await updateTwoFactor(next);
+
+      setTwoFactorEnabledState(response.isTwoFactorEnabled);
+
       toast.current?.show({
         severity: "success",
-        summary: confirmed ? "Two-factor authentication enabled" : "Two-factor authentication disabled",
+        summary: response.isTwoFactorEnabled
+          ? "Two-factor authentication enabled"
+          : "Two-factor authentication disabled",
         life: 3000,
       });
     } catch (err) {
-      setTwoFactorEnabledState(previous); // roll back
+      setTwoFactorEnabledState(previous);
+
       toast.current?.show({
         severity: "error",
         summary: "Couldn't update two-factor authentication",
@@ -78,7 +79,8 @@ export default function AdminSettings() {
               Two-factor authentication
             </p>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Require a one-time code in addition to your password when signing in.
+              Require a one-time code in addition to your password when signing
+              in.
             </p>
           </div>
           <InputSwitch

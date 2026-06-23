@@ -5,7 +5,7 @@ import { Badge } from "primereact/badge";
 import { Button } from "primereact/button";
 import { Menu } from "primereact/menu";
 import { useAuth } from "../context/AuthContext";
-import { useConfirmLogout } from "../hooks/UseConfirmLogout";
+import ConfirmLogoutDialog from "../components/ConfirmLogoutDialog";
 
 //Nav Items
 type NavItem = {
@@ -43,14 +43,20 @@ const navGroups: NavGroup[] = [
   },
 ];
 
-// ─── Component ───────────────────────────────────────────
-
 export default function AdminLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const menuRef = useRef<Menu>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const confirmLogout = useConfirmLogout();
+  const [logoutVisible, setLogoutVisible] = useState(false);
+
+  const handleLogout = async () => {
+    await logout();
+
+    setLogoutVisible(false);
+
+    navigate("/");
+  };
 
   const userMenuItems = [
     {
@@ -60,9 +66,11 @@ export default function AdminLayout() {
         { label: "Settings", icon: "pi pi-cog", command: () => navigate("/admin/settings") },
         { separator: true },
         {
-          label: "Logout",
-          icon: "pi pi-sign-out",
-          command: () => confirmLogout,
+          label:"Logout",
+          icon:"pi pi-sign-out",
+          command:()=>{
+            setLogoutVisible(true);
+          }
         },
       ],
     },
@@ -70,6 +78,11 @@ export default function AdminLayout() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
+      <ConfirmLogoutDialog
+        visible={logoutVisible}
+        onHide={()=>setLogoutVisible(false)}
+        onConfirm={handleLogout}
+      />
 
       {/* ── SIDEBAR ──────────────────────────────────── */}
       <aside

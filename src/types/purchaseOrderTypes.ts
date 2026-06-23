@@ -23,4 +23,5 @@ export type PurchaseOrder = {
 
   batch: string | null;
   status: string;
+  uom?: string;
 };

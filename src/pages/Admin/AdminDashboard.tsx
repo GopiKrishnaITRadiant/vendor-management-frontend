@@ -3,88 +3,115 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "primereact/button";
 import {getAdminDashboard, getPOSummary} from "../../services/DashboardService";
 
-// ─── Types ───────────────────────────────────────────────
+export interface DashboardStats {
+  totalPOs: number;
+  totalPOsThisWeek: number;
+  pendingASNs: number;
+  activeVendors: number;
+  suspendedVendors: number;
+  completedOrders: number;
+  completedThisMonth: number;
+}
 
-type ActivityItem = {
-  id: number;
-  type: "asn_submitted" | "asn_approved" | "asn_rejected" | "vendor_added" | "po_created";
-  message: string;
-  user: string;
-  time: string;
-};
+export interface POSummary {
+  totalPOLines: number;
+  open: number;
+  inProgress: number;
+  completed: number;
+}
 
-type TopVendor = {
-  name: string;
-  orders: number;
-  onTime: number;
-  asns: number;
-};
+export interface MonthlyActivity {
+  month: string;
+  submitted: number;
+  approved: number;
+  rejected: number;
+}
 
-// ─── Mock Data ───────────────────────────────────────────
+export type ActivityType =
+  | "CREATED"
+  | "SUBMITTED"
+  | "APPROVED"
+  | "REJECTED"
+  | "UPDATED";
 
-const recentActivity: ActivityItem[] = [
-  { id: 1, type: "asn_submitted", message: "ASN-2024-00126 submitted", user: "Exelan Pharma", time: "5 min ago" },
-  { id: 2, type: "asn_approved", message: "ASN-2024-00120 approved", user: "Admin • Ravi", time: "23 min ago" },
-  { id: 3, type: "po_created", message: "PO10012 created for Exelan Pharma", user: "Admin • Priya", time: "1 hr ago" },
-  { id: 4, type: "asn_rejected", message: "ASN-2024-00118 rejected", user: "Admin • Ravi", time: "2 hr ago" },
-  { id: 5, type: "vendor_added", message: "GlobalChem Inc added as vendor", user: "Admin • Priya", time: "Yesterday" },
-  { id: 6, type: "asn_submitted", message: "ASN-2024-00125 submitted", user: "GlobalChem Inc", time: "Yesterday" },
-];
+export interface RecentActivity {
+  asnId: number;
+  asnNumber: string;
+  poNo: string;
+  status: string;
+  activityType: ActivityType;
+  activityDate: string;
+}
 
-const topVendors: TopVendor[] = [
-  { name: "Exelan Pharma", orders: 142, onTime: 94, asns: 38 },
-  { name: "Health Corp", orders: 98, onTime: 88, asns: 26 },
-  { name: "Medi Supplies", orders: 76, onTime: 91, asns: 19 },
-  { name: "GlobalChem Inc", orders: 61, onTime: 96, asns: 15 },
-  { name: "BioGen Labs", orders: 34, onTime: 79, asns: 9 },
-];
+export interface TopVendor {
+  rank: number;
+  vendorId: number;
+  vendorNo: string | null;
+  vendorName: string;
+  totalOrders: number;
+  totalASNs: number;
+  deliveredASNs: number;
+  onTimeRate: number;
+}
 
-const monthlyASN = [
-  { month: "Jan", submitted: 28, approved: 24, rejected: 4 },
-  { month: "Feb", submitted: 35, approved: 30, rejected: 5 },
-  { month: "Mar", submitted: 42, approved: 38, rejected: 4 },
-  { month: "Apr", submitted: 38, approved: 33, rejected: 5 },
-  { month: "May", submitted: 51, approved: 44, rejected: 7 },
-  { month: "Jun", submitted: 46, approved: 39, rejected: 7 },
-];
+export interface AdminDashboardResponse {
+  stats: DashboardStats;
+  poSummary: POSummary;
+  monthlyActivity: MonthlyActivity[];
+  recentActivity: RecentActivity[];
+  topVendors: TopVendor[];
+}
 
 // ─── Helpers ─────────────────────────────────────────────
-
-const activityIcon: Record<ActivityItem["type"], { icon: string; color: string }> = {
-  asn_submitted: { icon: "pi pi-inbox", color: "text-primary" },
-  asn_approved: { icon: "pi pi-check-circle", color: "text-success" },
-  asn_rejected: { icon: "pi pi-times-circle", color: "text-danger" },
-  vendor_added: { icon: "pi pi-building", color: "text-warning" },
-  po_created: { icon: "pi pi-file", color: "text-muted-foreground" },
+const activityIcon: Record<
+  ActivityType,
+  { icon: string; color: string }
+> = {
+  CREATED: {
+    icon: "pi pi-plus-circle",
+    color: "text-primary",
+  },
+  SUBMITTED: {
+    icon: "pi pi-send",
+    color: "text-warning",
+  },
+  APPROVED: {
+    icon: "pi pi-check-circle",
+    color: "text-success",
+  },
+  REJECTED: {
+    icon: "pi pi-times-circle",
+    color: "text-danger",
+  },
+  UPDATED: {
+    icon: "pi pi-pencil",
+    color: "text-info",
+  },
 };
 
 const BAR_MAX = 55;
 
-// ─── Component ───────────────────────────────────────────
-
 export default function AdminDashboardPage() {
-  const [dashboard, setDashboard] = useState<any | null>(null);
-  const [monthlyASN, setMonthlyASN] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [dashboard, setDashboard] =
+  useState<AdminDashboardResponse | null>(null);
+
+const [monthlyASN, setMonthlyASN] =
+  useState<MonthlyActivity[]>([]);
+  // const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
     const loadDashboard = async () => {
       try {
-        setLoading(true);
-
-        const [dashboardRes, poSummaryRes] =
-          await Promise.all([
-            getAdminDashboard(),
-            getPOSummary(),
-          ]);
+        // setLoading(true);
+        const dashboardRes =await getAdminDashboard();
 
         setDashboard(dashboardRes);
         setMonthlyASN(dashboardRes?.monthlyActivity || []);
       } catch (error) {
         console.error("Dashboard API Error:", error);
       } finally {
-        setLoading(false);
+        // setLoading(false);
       }
     };
 
@@ -111,7 +138,7 @@ export default function AdminDashboardPage() {
       {/* KPI CARDS */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         {[
-          { label: "Total POs", value: dashboard?.stats?.totalPOs, sub: `${+dashboard?.stats?.totalPOsThisWeek} this week`, icon: "pi pi-file", color: "text-primary" },
+          { label: "Total POs", value: dashboard?.stats?.totalPOs, sub: `${dashboard?.stats?.totalPOsThisWeek??0} this week`, icon: "pi pi-file", color: "text-primary" },
           { label: "Pending ASNs", value: dashboard?.stats?.pendingASNs??0, sub: "Awaiting approval", icon: "pi pi-clock", color: "text-warning" },
           { label: "Active Vendors", value: dashboard?.stats?.activeVendors??0, sub: `${dashboard?.stats?.suspendedVendors??0} suspended`, icon: "pi pi-building", color: "text-success" },
           { label: "Completed Orders", value: dashboard?.stats?.completedOrders??0, sub: `This month ${dashboard?.stats?.completedThisMonth??0} `, icon: "pi pi-check-circle", color: "text-success" },
@@ -172,14 +199,21 @@ export default function AdminDashboardPage() {
         <div className="card p-5 space-y-3">
           <h2 className="text-sm font-semibold text-foreground">Recent Activity</h2>
           <div className="space-y-3">
-            {recentActivity.map((item) => {
-              const { icon, color } = activityIcon[item.type];
+            {dashboard?.recentActivity.map((item,i) => {
+              const { icon, color } = activityIcon[item.activityType];
               return (
-                <div key={item.id} className="flex items-start gap-3">
+                <div key={i} className="flex items-start gap-3">
                   <i className={`${icon} ${color} mt-0.5 text-sm`} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-foreground leading-tight">{item.message}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{item.user} · {item.time}</p>
+                    {/* <p className="text-sm text-foreground leading-tight">{item.message}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{item.user} · {item.time}</p> */}
+                    <p className="text-sm text-foreground leading-tight">
+                      ASN {item.asnNumber} ({item.poNo})
+                    </p>
+
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {item.activityType} • {item.status}
+                    </p>
                   </div>
                 </div>
               );
@@ -205,25 +239,25 @@ export default function AdminDashboardPage() {
               </tr>
             </thead>
             <tbody>
-              {topVendors.map((v, i) => (
-                <tr key={v.name} className="border-b border-border last:border-0 hover:bg-muted/30">
+              {dashboard?.topVendors.map((v, i:number) => (
+                <tr key={v.vendorId} className="border-b border-border last:border-0 hover:bg-muted/30">
                   <td className="py-2.5 px-3 font-medium text-foreground">
                     <span className="text-xs text-muted-foreground mr-2">#{i + 1}</span>
-                    {v.name}
+                    {v.vendorName}
                   </td>
-                  <td className="py-2.5 px-3 text-right">{v.orders}</td>
+                  <td className="py-2.5 px-3 text-right">{v.totalOrders}</td>
                   <td className="py-2.5 px-3">
                     <div className="flex items-center gap-2">
                       <div className="flex-1 h-1.5 bg-border rounded-full overflow-hidden">
                         <div
                           className="h-full bg-success rounded-full"
-                          style={{ width: `${v.onTime}%` }}
+                          style={{ width: `${v.onTimeRate}%` }}
                         />
                       </div>
-                      <span className="text-xs text-muted-foreground w-8 text-right">{v.onTime}%</span>
+                      <span className="text-xs text-muted-foreground w-8 text-right">{v.onTimeRate}%</span>
                     </div>
                   </td>
-                  <td className="py-2.5 px-3 text-right">{v.asns}</td>
+                  <td className="py-2.5 px-3 text-right">{v.totalASNs}</td>
                 </tr>
               ))}
             </tbody>
