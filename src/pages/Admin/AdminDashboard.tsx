@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "primereact/button";
 import { BarChart } from "../../components/vendor/dashboard/BarChart";
 import { getAdminDashboard } from "../../services/DashboardService";
+import { useAuth } from "../../context/AuthContext";
 
 export interface DashboardStats {
   totalPOs: number;
@@ -72,6 +73,7 @@ const activityIcon: Record<ActivityType, { icon: string; color: string }> = {
 };
 
 export default function AdminDashboardPage() {
+  const {isLoading,isAuthenticated}=useAuth()
   const [dashboard, setDashboard] = useState<AdminDashboardResponse | null>(
     null,
   );
@@ -80,6 +82,8 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     const loadDashboard = async () => {
       try {
+        if (isLoading || !isAuthenticated) return;
+
         const dashboardRes = await getAdminDashboard();
         setDashboard(dashboardRes);
       } catch (error) {
@@ -87,7 +91,7 @@ export default function AdminDashboardPage() {
       }
     };
     loadDashboard();
-  }, []);
+  }, [isLoading, isAuthenticated]);
 
   const chartData = useMemo(() => {
     return (dashboard?.monthlyActivity ?? []).map((m) => ({

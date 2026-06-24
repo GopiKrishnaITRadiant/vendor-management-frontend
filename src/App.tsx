@@ -29,7 +29,7 @@ import AdminSettings from "./pages/Admin/AdminSettings";
 function RootRedirect() {
   const { isAuthenticated, user, isLoading } = useAuth();
 
-  // if (isLoading) return <FullPageSpinner />; // never render null — avoids a flash of blank screen
+  if (isLoading) return <FullPageSpinner />; // never render null — avoids a flash of blank screen
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
@@ -66,7 +66,7 @@ function AppRoutes() {
           </Route>
         </Route>
 
-        {/* <Route element={<ProtectedRoute allowedRoles={["admin", "manager"]} />}> */}
+        <Route element={<ProtectedRoute allowedRoles={["admin", "manager"]} />}>
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<AdminDashboardPage />} />
             <Route path="asn-approvals" element={<AdminASNApprovalsPage />} />
@@ -76,7 +76,7 @@ function AppRoutes() {
             <Route  path= "profile" element={ <AdminProfile /> }/>
             <Route path= "settings" element={ <AdminSettings /> }/>
           </Route>
-        {/* </Route> */}
+        </Route>
       </Route>
 
       <Route path="*" element={<Navigate to="/not-found" replace />} />

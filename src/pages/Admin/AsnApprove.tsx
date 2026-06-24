@@ -8,13 +8,11 @@ import { Toast } from "primereact/toast";
 import AppTable from "../../components/table/DataTable";
 import { useDebounce } from "../../hooks/DebounceHook";
 import {
-  getAllASNs,
   approveASN,
   rejectASN,
   getASNStatusCounts,
+  getAllAdminASNs,
 } from "../../services/ASNService";
-
-// ─── Types ───────────────────────────────────────────────
 
 export type ASNStatus =
   | "draft"
@@ -32,9 +30,9 @@ export type ASNItem = {
   matCode:          string;
   matDesc:          string;
   ndcCode:          string;
-  orderedQty:       number;
-  availableQty:     number;
-  deliverableQty:   number;
+  originalQty:       number;
+  submittedQty:     number;
+  availableQty:   number;
   uom:              string;
   batchNo:          string;
   manufactureDate:  string | null;
@@ -104,7 +102,7 @@ const STATUS_BADGE: Record<ASNStatus, { label: string; className: string }> = {
 export default function AdminASNApprovalsPage() {
   const toast = useRef<Toast>(null);
 
-  // ── Table state ───────────────────────────────────────
+  //Table state
   const [asns,         setAsns]         = useState<ASN[]>([]);
   const [loading,      setLoading]      = useState(true);
   const [page,         setPage]         = useState(1);
@@ -113,23 +111,23 @@ export default function AdminASNApprovalsPage() {
   const [search,       setSearch]       = useState("");
   const debouncedSearch                 = useDebounce(search, 500);
 
-  // ── Filter state — server-side ────────────────────────
+  //Filter state — server-side
   const [statusFilter, setStatusFilter] = useState<ASNStatus | null>(null);
 
-  // ── KPI counts ────────────────────────────────────────
+  //KPI counts
   const [counts, setCounts] = useState<StatusCounts>({
     total: 0, pending: 0, approved: 0, rejected: 0,
   });
   const [countsLoading, setCountsLoading] = useState(true);
 
-  // ── Dialog state ─────────────────────────────────────
+  //Dialog state
   const [selectedASN,          setSelectedASN]          = useState<ASN | null>(null);
   const [dialogVisible,        setDialogVisible]        = useState(false);
   const [rejectDialogVisible,  setRejectDialogVisible]  = useState(false);
   const [rejectReason,         setRejectReason]         = useState("");
   const [actionLoading,        setActionLoading]        = useState(false);
 
-  // ── Load KPI counts once (independent of table filters) ─
+  //Load KPI counts once (independent of table filters)
   const loadCounts = useCallback(async () => {
     try {
       setCountsLoading(true);
@@ -142,16 +140,16 @@ export default function AdminASNApprovalsPage() {
     }
   }, []);
 
-  // ── Load table data ───────────────────────────────────
+  // Load table data
   // Re-runs when page, rows, search, or statusFilter changes
   const loadASNs = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await getAllASNs(
+      const response = await getAllAdminASNs(
         page,
         rows,
         debouncedSearch,
-        statusFilter ?? undefined,   // ← server-side filter
+        statusFilter ?? undefined,
       );
       setAsns(response.data);
       setTotalRecords(response.total);
@@ -167,7 +165,7 @@ export default function AdminASNApprovalsPage() {
     }
   }, [page, rows, debouncedSearch, statusFilter]);
 
-  // ── Reset to page 1 when filter/search changes ────────
+  //Reset to page 1 when filter/search changes
   useEffect(() => {
     setPage(1);
   }, [debouncedSearch, statusFilter]);
@@ -279,13 +277,11 @@ export default function AdminASNApprovalsPage() {
 
   const handleStatusFilterChange = (value: ASNStatus | null) => {
     setStatusFilter(value);
-    setPage(1);   // reset to first page on filter change
+    setPage(1);
   };
 
   const canActOn = (status: ASNStatus) =>
     status === "submitted" || status === "draft";
-
-  // ── Render ────────────────────────────────────────────
 
   return (
     <div className="page-container py-6 space-y-6">
@@ -457,8 +453,8 @@ export default function AdminASNApprovalsPage() {
                   { field: "matCode",         header: "Material Code" },
                   { field: "matDesc",         header: "Description" },
                   { field: "ndcCode",         header: "NDC" },
-                  { field: "orderedQty",      header: "Ordered Qty" },
-                  { field: "deliverableQty",  header: "Deliverable Qty" },
+                  { field: "originalQty",      header: "Ordered Qty" },
+                  { field: "submittedQty",  header: "Deliverable Qty" },
                   { field: "uom",             header: "UOM" },
                   { field: "batchNo",         header: "Batch No" },
                   { field: "numberOfPackages",header: "Packages" },

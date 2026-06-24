@@ -8,8 +8,6 @@ import {
 } from "react";
 import { registerAuthHooks, authApi } from "../api/client";
 
-// ─── Types ───────────────────────────────────────────────
-
 export type UserRole = "vendor" | "admin" | "manager";
 
 export type AuthUser = {
@@ -28,7 +26,7 @@ type LoginResult =
 export const ROLE_HOME_ROUTE: Record<UserRole, string> = {
   admin:   "/admin",
   manager: "/admin",
-  vendor:  "/purchase-orders",
+  vendor:  "/vendor-dashboard",
 };
 
 export function getRoleHomeRoute(role?: UserRole | null): string {
@@ -131,7 +129,6 @@ export function AuthProvider({ children }: { children: any }) {
 
         const json    = await res.json();
         // Handle both { data: { accessToken, user } } and { accessToken, user }
-        console.log(json.data,'json');
         const payload = json.data ?? json;
 
         if (!payload.accessToken) throw new Error("no token");

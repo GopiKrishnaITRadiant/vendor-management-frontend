@@ -9,6 +9,7 @@ import type {
   VendorDashboardResponse,
 } from "../../types/vendorDashboardTypes";
 import { getVendorDashboard } from "../../services/DashboardService";
+import { useAuth } from "../../context/AuthContext";
 
 const ASN_STATUS_STYLE: Record<RecentAsnStatus, string> = {
   draft:     "bg-gray-50 text-gray-700",
@@ -42,14 +43,16 @@ function StatusBadge({ label, className }: { label: string; className: string })
 }
 
 export default function VendorDashboardPage() {
+  const { isLoading, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
   const [period, setPeriod] = useState<ActivityPeriod>("month");
   const [dashboard, setDashboard] = useState<VendorDashboardResponse["data"] | null>(null);
 
   useEffect(() => {
+    if (isLoading || !isAuthenticated) return;
     loadDashboard();
-  }, [period]);
+  }, [period, isLoading, isAuthenticated]);
 
   const loadDashboard = async () => {
     try {
