@@ -15,6 +15,11 @@ export type ASNItem = {
   matDesc:          string;
   ndcCode:          string;
   uom:              string;
+  originalQty:       number;
+  submittedQty:     number;
+  deliverableQty:   number;
+  batchNo:          string;
+  manufactureDate:  Date | null;
   numberOfPackages: number;
   packageType:      string;
   grossWeight:      string | null;

@@ -24,13 +24,12 @@ import AdminUsersRolesPage from "./pages/Admin/AdminUserRoles";
 import ProtectedRoute from "./routes/ProtectedRoutes";
 import AdminProfile from "./pages/Admin/AdminProfile";
 import AdminSettings from "./pages/Admin/AdminSettings";
-import { ConfirmDialog } from "primereact/confirmdialog";
 
-// ── Root redirect — waits for the silent /auth/refresh bootstrap ──
+//Root redirect — waits for the silent /auth/refresh bootstrap
 function RootRedirect() {
   const { isAuthenticated, user, isLoading } = useAuth();
 
-  if (isLoading) return <FullPageSpinner />; // never render null — avoids a flash of blank screen
+  // if (isLoading) return <FullPageSpinner />; // never render null — avoids a flash of blank screen
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
@@ -56,7 +55,7 @@ function AppRoutes() {
 
       <Route element={<MainLayout />}>
         {/* role values match backend role.name exactly: 'vendor' | 'admin' | 'manager' */}
-        {/* <Route element={<ProtectedRoute allowedRoles={["vendor"]} />}> */}
+        <Route element={<ProtectedRoute allowedRoles={["vendor"]} />}>
           <Route element={<VendorLayout />}>
             <Route index path="/vendor-dashboard" element={<VendorDashboardPage />} />
             <Route path="/purchase-orders" element={<PurchaseOrdersPage />} />
@@ -65,9 +64,9 @@ function AppRoutes() {
             <Route  path= "profile" element={ <AdminProfile /> }/>
             <Route path= "settings" element={ <AdminSettings /> }/>
           </Route>
-        {/* </Route> */}
+        </Route>
 
-        <Route element={<ProtectedRoute allowedRoles={["admin", "manager"]} />}>
+        {/* <Route element={<ProtectedRoute allowedRoles={["admin", "manager"]} />}> */}
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<AdminDashboardPage />} />
             <Route path="asn-approvals" element={<AdminASNApprovalsPage />} />
@@ -77,7 +76,7 @@ function AppRoutes() {
             <Route  path= "profile" element={ <AdminProfile /> }/>
             <Route path= "settings" element={ <AdminSettings /> }/>
           </Route>
-        </Route>
+        {/* </Route> */}
       </Route>
 
       <Route path="*" element={<Navigate to="/not-found" replace />} />

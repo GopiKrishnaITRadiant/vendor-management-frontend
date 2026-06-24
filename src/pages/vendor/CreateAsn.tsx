@@ -504,7 +504,7 @@ export default function CreateASNPage() {
                           updateLine(row.id, "deliverableQty", e.value ?? 1)
                         }
                         min={1}
-                        max={row.originalQty}
+                        // max={row.originalQty}
                         className={row.deliverableQty < 1 ? "p-invalid" : ""}
                       />
                     ),

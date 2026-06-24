@@ -182,6 +182,7 @@ export function ASNDetailDialog({
               <div className="col-span-1 text-right">PO Qty</div>
               <div className="col-span-1 text-right">Ship Qty</div>
               <div className="col-span-2">Batch No.</div>
+              {/* <div className="col-span-2">NDC Code</div> */}
               <div className="col-span-2">Expiry</div>
             </div>
 
@@ -208,20 +209,21 @@ export function ASNDetailDialog({
                   {line.matDesc}
                 </div>
                 <div className="col-span-1 text-right text-foreground">
-                  {line.uom.toLocaleString()}
+                  {line.originalQty.toLocaleString()}
                 </div>
                 <div className="col-span-1 text-right font-medium text-foreground">
-                  {line.numberOfPackages.toLocaleString()}
+                  {line.submittedQty.toLocaleString()}
                 </div>
                 <div className="col-span-2">
                   {line.poItem ? (
                     <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">
-                      {line.poItem}
+                      {line.batchNo}
                     </span>
                   ) : (
                     <span className="text-red-500 text-xs">Missing</span>
                   )}
                 </div>
+                {/* <div className="col-span-1 text-right text-foreground">{line?.ndcCode??"-"}</div> */}
                 <div className="col-span-2 text-xs text-muted-foreground">
                   {line.expiryDate?.toLocaleDateString() || "—"}
                 </div>

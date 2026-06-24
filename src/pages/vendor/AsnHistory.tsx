@@ -55,7 +55,7 @@ export default function ASNHistoryPage() {
       const response = await getAllASNs(
         page,
         rows,
-        String(user?.id||'1'),
+        String(user?.sapVendorId||'1'),
         debouncedSearch,
         activeTab === "All" ? undefined : activeTab
       );

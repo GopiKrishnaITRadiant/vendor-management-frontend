@@ -2,266 +2,225 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   useCallback,
-  useRef,
 } from "react";
-import { registerAuthHooks, authApi, apiFetch } from "../api/client";
+import { registerAuthHooks, authApi } from "../api/client";
 
 // ─── Types ───────────────────────────────────────────────
 
 export type UserRole = "vendor" | "admin" | "manager";
 
 export type AuthUser = {
-  id: number;
-  fullName?: string;
-  email: string;
-  role: { id: number; name: UserRole };
+  id:                 number;
+  fullName:           string;
+  email:              string;
+  role:               { id: number; name: UserRole };
   isTwoFactorEnabled: boolean;
+  sapVendorId:        string | null;
 };
 
 type LoginResult =
-  | { requiresOtp: true; otpToken: string; message?: string }
+  | { requiresOtp: true;  otpToken: string; message?: string }
   | { requiresOtp: false; user: AuthUser };
 
-// Single source of truth for "where does this role land after login".
-// Must stay in sync with RootRedirect in App.tsx — admin and manager
-// both land on /admin (AdminLayout), vendor lands on /purchase-orders
-// (the indexed vendor route under VendorLayout).
 export const ROLE_HOME_ROUTE: Record<UserRole, string> = {
-  admin: "/admin",
+  admin:   "/admin",
   manager: "/admin",
-  vendor: "/purchase-orders",
+  vendor:  "/purchase-orders",
 };
 
-export function getRoleHomeRoute(role: UserRole | undefined | null): string {
+export function getRoleHomeRoute(role?: UserRole | null): string {
   if (!role || !(role in ROLE_HOME_ROUTE)) return "/login";
   return ROLE_HOME_ROUTE[role];
 }
 
 type AuthContextType = {
-  user: AuthUser | null;
-  isLoading: boolean;
+  user:            AuthUser | null;
+  isLoading:       boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<LoginResult>;
-  sendOtp: (
-    email: string,
-  ) => Promise<{ data: { message: string; otpToken: string } }>;
-  verifyOtp: (otpToken: string, otp: string) => Promise<void>;
-  resendOtp: (
-    otpToken: string,
-  ) => Promise<{ message: string; otpToken: string }>;
-  logout: () => Promise<void>;
+  login:     (email: string, password: string) => Promise<LoginResult>;
+  sendOtp:   (email: string) => Promise<{ message: string; otpToken: string; expiresIn: number }>;
+  verifyOtp: (otpToken: string, otp: string) => Promise<{ accessToken: string; user: AuthUser }>;
+  resendOtp: (otpToken: string) => Promise<{ message: string; otpToken: string }>;
+  logout:    () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// ─────────────────────────────────────────────────────────
+// SECURITY MODEL
+//
+// Access token  → JS memory only (useRef — not even React state)
+//                 Lost on refresh — intentional
+//
+// User object   → decoded from access token payload
+//                 Never stored anywhere — re-derived after each
+//                 silent refresh from the token itself
+//                 No sessionStorage, no localStorage
+//
+// Refresh token → httpOnly cookie
+//                 Browser sends it automatically
+//                 JS cannot read it — XSS-safe
+//
+// On page refresh:
+//   1. Access token is gone (memory cleared)
+//   2. /auth/refresh is called — browser sends httpOnly cookie
+//   3. Server returns new { accessToken, user } in response body
+//   4. User is re-hydrated from the response — no storage read
+//
+// Why not sessionStorage for user?
+//   sessionStorage is readable by any JS on the page.
+//   XSS can read it. The user object contains id, email,
+//   role, sapVendorId — useful for targeted attacks even
+//   without the token. Keep it out of any storage.
+// ─────────────────────────────────────────────────────────
+
 export function AuthProvider({ children }: { children: any }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [accessToken, setAccessTokenState] = useState<string | null>(null);
+  const [user,      setUser]      = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const tokenRef = useRef<string | null>(null);
-  useEffect(() => {
-    tokenRef.current = accessToken;
-  }, [accessToken]);
+  // Access token in a ref — NOT React state.
+  // We don't want token changes to trigger re-renders.
+  // Components never read the token directly — they use
+  // apiFetch() which reads from this ref via the hook.
+  const tokenRef         = useRef<string | null>(null);
+  const bootstrappedRef  = useRef(false);
 
-  const applySession = useCallback(
-    (newAccessToken: string, newUser: AuthUser) => {
-      setAccessTokenState(newAccessToken);
-      setUser(newUser);
-    },
-    [],
-  );
+  const applySession = useCallback((token: string, u: AuthUser) => {
+    tokenRef.current = token;
+    setUser(u);
+  }, []);
 
   const clearSession = useCallback(() => {
-    setAccessTokenState(null);
+    tokenRef.current = null;
     setUser(null);
   }, []);
 
-  // Wire apiFetch's refresh hooks to current React state
+  // Wire apiFetch to this ref
   useEffect(() => {
     registerAuthHooks({
-  getAccessToken: () => tokenRef.current,
+      getAccessToken: () => tokenRef.current,
 
-  onRefreshed: (newAccessToken) => {
-    console.log("TOKEN REFRESHED", newAccessToken);
-    setAccessTokenState(newAccessToken);
-  },
+      onRefreshed: (newToken: string, newUser: AuthUser | null) => {
+        tokenRef.current = newToken;
+        // If server also returns updated user on refresh, apply it
+        if (newUser) setUser(newUser);
+      },
 
-  onAuthFailed: () => {
-    console.log("AUTH FAILED - CLEARING SESSION");
-
-    clearSession();
-  },
-});
+      onAuthFailed: clearSession,
+    });
   }, [clearSession]);
 
-  // On mount: try to mint an access token from the httpOnly
-  // refresh cookie. If there's no valid cookie, this 401s and
-  // we just land on the login page — no error shown.
+  // ── Silent refresh on mount ───────────────────────────
+  // The refresh endpoint returns BOTH accessToken AND user
+  // so we never need a separate /users/me call
+
   useEffect(() => {
+    // if (bootstrappedRef.current) return;
+    // bootstrappedRef.current = true;
+
     let cancelled = false;
 
     async function bootstrap() {
       try {
-        const refreshRes = await authApi.refresh();
+        const res = await authApi.refresh();
 
-        if (!refreshRes.ok) {
-          throw new Error("No valid session");
-        }
+        if (!res.ok) throw new Error("no session");
 
-        const refreshJson = await refreshRes.json();
+        const json    = await res.json();
+        // Handle both { data: { accessToken, user } } and { accessToken, user }
+        console.log(json.data,'json');
+        const payload = json.data ?? json;
 
-        const accessToken = refreshJson.data.accessToken;
+        if (!payload.accessToken) throw new Error("no token");
 
-        const meRes = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL}/users/me`,
-          {
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-            },
-          },
-        );
-
-        if (!meRes.ok) {
-          throw new Error("Failed to load user");
-        }
-
-        const meJson = await meRes.json();
-
-        console.log("refresh token", accessToken);
-        console.log("me response", meJson);
-
-        if (!cancelled) {
-          applySession(
-            accessToken,
-            meJson.data, // IMPORTANT
-          );
-        }
-      } catch (error) {
-        console.error(error);
-
-        if (!cancelled) {
-          clearSession();
-        }
+        if (!cancelled) applySession(payload.accessToken, payload.user);
+      } catch {
+        if (!cancelled) clearSession();
       } finally {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
+        if (!cancelled) setIsLoading(false);
       }
     }
 
     bootstrap();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [applySession, clearSession]);
 
-  // ── Step 1: email + password ──────────────────────────
+  // ── Login ─────────────────────────────────────────────
 
   const login = useCallback(
     async (email: string, password: string): Promise<LoginResult> => {
-      const res = await authApi.login(email, password);
+      const res  = await authApi.login(email, password);
+      const json = await res.json().catch(() => ({}));
 
-      const response = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.message ?? "Invalid email or password");
 
-      if (!res.ok) {
-        throw new Error(response.message ?? "Invalid email or password");
-      }
+      const data = json.data ?? json;
 
-      const data = response.data;
-
-      if (!data) {
-        throw new Error("Invalid server response");
-      }
-
-      // OTP flow
       if (data.requiresOtp) {
-        return {
-          requiresOtp: true,
-          otpToken: data.otpToken,
-          message: data.message,
-        };
+        return { requiresOtp: true, otpToken: data.otpToken, message: data.message };
       }
 
-      // Login success
       applySession(data.accessToken, data.user);
-
-      return {
-        requiresOtp: false,
-        user: data.user,
-      };
+      return { requiresOtp: false, user: data.user };
     },
     [applySession],
   );
 
-  // ── Step 2: verify OTP (first login only) ──────────────
-  // This step only confirms the OTP is correct — it does NOT
-  // establish a session. The session is created afterwards by
-  // calling login(email, password) (Step 3 in Login.tsx), since
-  // identity has already been confirmed via OTP.
-
-  const verifyOtp = useCallback(
-    async (otpToken: string, otp: string): Promise<void> => {
-      const res = await authApi.verifyFirstLoginOtp(otpToken, otp);
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        throw new Error(data.message ?? "Invalid or expired OTP");
-      }
-
-      // No applySession here — confirmation only.
-    },
-    [],
-  );
+  // ── Send OTP ──────────────────────────────────────────
 
   const sendOtp = useCallback(async (email: string) => {
-    const res = await authApi.sendOtp(email);
-    const data = await res.json().catch(() => ({}));
-
-    if (!res.ok) {
-      throw new Error(data.message ?? "Could not send OTP");
-    }
-
-    return data;
+    const res  = await authApi.sendOtp(email);
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json.message ?? "Could not send OTP");
+    const data = json.data ?? json;
+    return data as { message: string; otpToken: string; expiresIn: number };
   }, []);
+
+  // ── Verify OTP ────────────────────────────────────────
+
+  const verifyOtp = useCallback(
+    async (otpToken: string, otp: string) => {
+      const res  = await authApi.verifyOtp(otpToken, otp);
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.message ?? "Invalid or expired OTP");
+      const data = json.data ?? json;
+      applySession(data.accessToken, data.user);
+      return data as { accessToken: string; user: AuthUser };
+    },
+    [applySession],
+  );
+
+  // ── Resend OTP ────────────────────────────────────────
 
   const resendOtp = useCallback(async (otpToken: string) => {
-    const res = await authApi.resendOtp(otpToken);
-    const data = await res.json().catch(() => ({}));
-
-    if (!res.ok) {
-      throw new Error(data.message ?? "Could not resend OTP");
-    }
-
-    return data; // { message, otpToken } — caller must update its local otpToken
+    const res  = await authApi.resendOtp(otpToken);
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json.message ?? "Could not resend OTP");
+    const data = json.data ?? json;
+    return data as { message: string; otpToken: string };
   }, []);
 
+  // ── Logout ────────────────────────────────────────────
+
   const logout = useCallback(async () => {
-    try {
-      await authApi.logout();
-    } catch {
-      // clear local state regardless of network outcome
-    } finally {
-      clearSession();
-    }
+    try { await authApi.logout(); } catch { /* always clear */ }
+    finally { clearSession(); }
   }, [clearSession]);
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isLoading,
-        isAuthenticated: !!user && !!accessToken,
-        login,
-        sendOtp,
-        verifyOtp,
-        resendOtp,
-        logout,
-      }}
-    >
+    <AuthContext.Provider value={{
+      user,
+      isLoading,
+      isAuthenticated: !!user && !!tokenRef.current,
+      login,
+      sendOtp,
+      verifyOtp,
+      resendOtp,
+      logout,
+    }}>
       {children}
     </AuthContext.Provider>
   );

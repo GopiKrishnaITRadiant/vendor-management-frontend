@@ -153,7 +153,7 @@ export default function Login() {
 
     try {
       const data = await auth.sendOtp(form.email);
-      setOtpToken(data.data.otpToken);
+      setOtpToken(data.otpToken);
       setStep("OTP");
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Could not send OTP");

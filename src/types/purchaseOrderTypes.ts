@@ -25,3 +25,25 @@ export type PurchaseOrder = {
   status: string;
   uom?: string;
 };
+
+
+export type StatusTab = PurchaseOrder["status"] | "All";
+
+export interface Stats {
+  totalPOLines: number;
+  open:         number;
+  inProgress:   number;
+  completed:    number;
+}
+
+export interface POGroup {
+  poNo:      string;
+  vendorNo:  string;
+  poType:    string | null;
+  soldTo:    string;
+  status:    PurchaseOrder["status"];
+  lineCount: number;
+  totalQty:  number;
+  updatedAt: string;
+  lineItems: PurchaseOrder[];
+}

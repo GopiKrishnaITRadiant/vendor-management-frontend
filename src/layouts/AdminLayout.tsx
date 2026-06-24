@@ -1,7 +1,6 @@
 import { useRef, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { Avatar } from "primereact/avatar";
-import { Badge } from "primereact/badge";
 import { Button } from "primereact/button";
 import { Menu } from "primereact/menu";
 import { useAuth } from "../context/AuthContext";
@@ -68,6 +67,7 @@ export default function AdminLayout() {
         {
           label:"Logout",
           icon:"pi pi-sign-out",
+
           command:()=>{
             setLogoutVisible(true);
           }
@@ -157,7 +157,7 @@ export default function AdminLayout() {
           {sidebarOpen && (
             <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg">
               <Avatar
-                label={user?.fullName?.charAt(0).toUpperCase()}
+                label={(user?.fullName||user?.email)?.charAt(0).toUpperCase()}
                 size="normal"
                 shape="circle"
                 className="bg-primary text-white shrink-0"
