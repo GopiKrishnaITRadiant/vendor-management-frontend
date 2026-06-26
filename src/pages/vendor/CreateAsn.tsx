@@ -147,10 +147,7 @@ function Field({
   );
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
-
 export default function CreateASNPage() {
-  const { user }   = useAuth();
   const navigate   = useNavigate();
   const toast      = useRef<Toast>(null);
   const { state }  = useLocation();
@@ -159,7 +156,7 @@ export default function CreateASNPage() {
   const [step,   setStep]   = useState<1 | 2>(1);
   const [saving, setSaving] = useState(false);
 
-  // ── Step 1 state ─────────────────────────────────────────────────────────────
+  //Step 1 state
   // warehouseType is the one required field on the ASN header (drives SD60/SD61)
   const [warehouseType,          setWarehouseType]          = useState<WarehouseType>("SD60");
   const [estimatedShipDate,      setEstimatedShipDate]      = useState<Date | null>(null);
@@ -170,7 +167,7 @@ export default function CreateASNPage() {
   const [shipFromAddress,        setShipFromAddress]        = useState("");
   const [notes,                  setNotes]                  = useState("");
 
-  // ── Step 2 state ─────────────────────────────────────────────────────────────
+  //Step 2 state
   const [asnLines, setAsnLines] = useState<ASNLineForm[]>(
     selectedOrders.map((po) => ({
       id:              po.id,
@@ -200,7 +197,7 @@ export default function CreateASNPage() {
       prev.map((line) => (line.id === id ? { ...line, [field]: value } : line))
     );
 
-  // ── Validation ────────────────────────────────────────────────────────────────
+  // Validation
   // Step 1: warehouseType + estimatedShipDate are the only required fields
   const isStep1Valid =
     warehouseType !== null &&
@@ -210,7 +207,7 @@ export default function CreateASNPage() {
   // All other line fields are optional per the DTO (@IsOptional)
   const isStep2Valid = asnLines.every((l) => l.deliverableQty >= 1);
 
-  // ── Save as Draft ─────────────────────────────────────────────────────────────
+  //Save as Draft
   const handleSaveAsDraft = async () => {
     if (!isStep1Valid || !isStep2Valid) return;
     setSaving(true);
@@ -261,7 +258,7 @@ export default function CreateASNPage() {
     }
   };
 
-  // ── Empty state ────────────────────────────────────────────────────────────────
+  //Empty state
   if (selectedOrders.length === 0) {
     return (
       <div className="page-container py-12 flex flex-col items-center justify-center space-y-4 text-center">
@@ -284,7 +281,6 @@ export default function CreateASNPage() {
     );
   }
 
-  // ── Render ─────────────────────────────────────────────────────────────────────
   return (
     <div className="page-container py-6 space-y-6">
       <Toast ref={toast} />
@@ -368,14 +364,14 @@ export default function CreateASNPage() {
                 />
               </Field>
 
-              <Field label="Tracking Number">
+              {/* <Field label="Tracking Number">
                 <InputText
                   value={trackingNumber}
                   onChange={(e) => setTrackingNumber(e.target.value)}
                   placeholder="e.g. FX123456789"
                   className="w-full"
                 />
-              </Field>
+              </Field> */}
 
               <Field label="Shipment Mode">
                 <Dropdown
@@ -500,11 +496,9 @@ export default function CreateASNPage() {
                     body: (row: ASNLineForm) => (
                       <InputNumber
                         value={row.deliverableQty}
-                        onValueChange={(e) =>
-                          updateLine(row.id, "deliverableQty", e.value ?? 1)
-                        }
+                        onValueChange={(e) => updateLine(row.id, "deliverableQty", e.value ?? 1)}
                         min={1}
-                        // max={row.originalQty}
+                        inputStyle={{ width: "80px" }}
                         className={row.deliverableQty < 1 ? "p-invalid" : ""}
                       />
                     ),
@@ -517,7 +511,7 @@ export default function CreateASNPage() {
                         value={row.uom}
                         options={uomOptions}
                         onChange={(e) => updateLine(row.id, "uom", e.value)}
-                        className="w-full"
+                        style={{ width: "120px" }}
                       />
                     ),
                   },
@@ -571,10 +565,9 @@ export default function CreateASNPage() {
                     body: (row: ASNLineForm) => (
                       <InputNumber
                         value={row.numberOfPackages}
-                        onValueChange={(e) =>
-                          updateLine(row.id, "numberOfPackages", e.value ?? 1)
-                        }
+                        onValueChange={(e) => updateLine(row.id, "numberOfPackages", e.value ?? 1)}
                         min={1}
+                        inputStyle={{ width: "70px" }}
                       />
                     ),
                   },
@@ -596,24 +589,20 @@ export default function CreateASNPage() {
                     field: "grossWeight" as keyof ASNLineForm,
                     header: "Gross Wt.",
                     body: (row: ASNLineForm) => (
-                      <div className="flex gap-1">
+                      <div className="flex items-center gap-1">
                         <InputNumber
                           value={row.grossWeight}
-                          onValueChange={(e) =>
-                            updateLine(row.id, "grossWeight", e.value ?? null)
-                          }
+                          onValueChange={(e) => updateLine(row.id, "grossWeight", e.value ?? null)}
                           placeholder="0.000"
                           minFractionDigits={0}
                           maxFractionDigits={3}
-                          className="w-24"
+                          inputStyle={{ width: "75px" }}
                         />
                         <Dropdown
                           value={row.weightUnit}
                           options={weightUnitOptions}
-                          onChange={(e) =>
-                            updateLine(row.id, "weightUnit", e.value)
-                          }
-                          className="w-20"
+                          onChange={(e) => updateLine(row.id, "weightUnit", e.value)}
+                          style={{ width: "75px" }}
                         />
                       </div>
                     ),

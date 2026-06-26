@@ -131,6 +131,7 @@ export default function AdminPurchaseOrdersPage() {
         <Column field="soldTo" header="Sold To" />
         <Column field="incoterm1" header="Incoterm 1" />
         <Column field="incoterm2" header="Incoterm 2" />
+        <Column field="odpoQuan" header="odpoQuan" />
 
         <Column
           field="status"
@@ -237,9 +238,13 @@ export default function AdminPurchaseOrdersPage() {
 
           <Column field="soldTo" header="Sold To" />
 
-          <Column field="poType" header="PO Type" />
-
+          <Column
+            header="PO Type"
+            body={(row) => row.poType ?? "-"}
+          />
           <Column field="totalQty" header="Total Qty" />
+          <Column field="deliveredQty" header="Delivered" />
+          <Column field="fulfillmentStatus" header="Fulfillment Status" />
 
           <Column
             field="updatedAt"
@@ -292,6 +297,14 @@ export default function AdminPurchaseOrdersPage() {
 
             <div>
               <strong>Batch:</strong> {selectedPO.batch}
+            </div>
+
+            <div>
+              <strong>Incoterm 1:</strong> {selectedPO.incoterm1}
+            </div>
+
+            <div>
+              <strong>odpoQuan:</strong> {selectedPO.odpoQuan}
             </div>
           </div>
         )}
