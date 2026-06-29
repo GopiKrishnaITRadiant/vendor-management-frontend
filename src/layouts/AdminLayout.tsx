@@ -31,6 +31,11 @@ const navGroups: NavGroup[] = [
     items: [
       { label: "ASN Approvals", icon: "pi pi-inbox", path: "/admin/asn-approvals", },
       { label: "Purchase Orders", icon: "pi pi-file", path: "/admin/purchase-orders" },
+      {
+        label: "SAP Sync Logs",
+        icon: "pi pi-sync",
+        path: "/admin/sap-sync-logs",
+      },
     ],
   },
   {

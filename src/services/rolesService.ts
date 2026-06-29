@@ -1,5 +1,3 @@
-// services/roleService.ts
-
 import { apiFetch } from "../api/client";
 
 export const getAllRoles = async () => {

@@ -6,9 +6,9 @@ import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
 import { InputText } from "primereact/inputtext";
 import { getPurchaseOrders, getVendorPurchaseOrderSummary } from "../../services/PurchaseOrderService";
-import { useDebounce } from "../../hooks/DebounceHook";
 import { useAuth } from "../../context/AuthContext";
 import type { POGroup, PurchaseOrder, Stats, StatusTab } from "../../types/purchaseOrderTypes";
+import { useDebounce } from "../../hooks/debounceHook";
 
 
 const STATUS_STYLE: Record<string, string> = {

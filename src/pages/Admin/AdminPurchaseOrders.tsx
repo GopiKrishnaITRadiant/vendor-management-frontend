@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Toast } from "primereact/toast";
-import { DataTable } from "primereact/datatable";
-import { Column } from "primereact/column";
-import { InputText } from "primereact/inputtext";
 import { Dialog } from "primereact/dialog";
 import { Button } from "primereact/button";
 
+import AppTable from "../../components/table/DataTable";
 import { getPurchaseOrders } from "../../services/PurchaseOrderService";
 import { getAdminDashboard } from "../../services/DashboardService";
-import { useDebounce } from "../../hooks/DebounceHook";
+import { useDebounce } from "../../hooks/debounceHook";
 
 import type { POGroup, PurchaseOrder } from "../../types/purchaseOrderTypes";
+import type { ExpandedColumn } from "../ExpandableTable";
+import ExpandedTable from "../ExpandableTable";
+
+// ─── Status badge ─────────────────────────────────────────────────────────────
 
 const STATUS_STYLE: Record<string, string> = {
   active: "bg-blue-50 text-blue-700",
@@ -32,24 +34,59 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+// ─── Line-item expanded columns ───────────────────────────────────────────────
+
+const buildLineItemColumns = (
+  handleView: (row: PurchaseOrder) => void,
+): ExpandedColumn<PurchaseOrder>[] => [
+  { field: "poItem",    header: "Item #" },
+  { field: "batch",     header: "Batch" },
+  { field: "matCode",   header: "Material Code" },
+  { field: "matDesc",   header: "Description" },
+  { field: "actQty",    header: "Quantity" },
+  { field: "vendorNo",  header: "Vendor No" },
+  { field: "soldTo",    header: "Sold To" },
+  { field: "incoterm1", header: "Incoterm 1" },
+  { field: "incoterm2", header: "Incoterm 2" },
+  { field: "odpoQuan",  header: "ODPO Quan" },
+  {
+    header: "Status",
+    body: (row) => <StatusBadge status={row.status} />,
+  },
+  {
+    header: "Actions",
+    style: { width: "60px" },
+    body: (row) => (
+      <Button icon="pi pi-eye" text rounded onClick={() => handleView(row)} />
+    ),
+  },
+];
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function AdminPurchaseOrdersPage() {
   const toast = useRef<Toast>(null);
 
   const [poGroups, setPoGroups] = useState<POGroup[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
-
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
-
   const [viewDialogVisible, setViewDialogVisible] = useState(false);
 
   const [page, setPage] = useState(1);
   const [rows, setRows] = useState(10);
   const [totalRecords, setTotalRecords] = useState(0);
+  const [first, setFirst] = useState(0);
 
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 500);
+
+  const [tableKey, setTableKey] = useState(0);
+  useEffect(() => {
+    setPage(1);
+    setFirst(0);
+    setTableKey((k) => k + 1);
+  }, [debouncedSearch]);
 
   const [stats, setStats] = useState({
     totalPOLines: 0,
@@ -60,106 +97,63 @@ export default function AdminPurchaseOrdersPage() {
 
   const requestIdRef = useRef(0);
 
+  // ── Data loading ────────────────────────────────────────────────────────────
+
   const loadPurchaseOrders = useCallback(async () => {
     const requestId = ++requestIdRef.current;
-
     try {
       setLoading(true);
-
       const response = await getPurchaseOrders(page, rows, debouncedSearch);
-
       if (requestId !== requestIdRef.current) return;
-
       setPoGroups(response.data);
       setTotalRecords(response.total);
     } catch (error: any) {
       toast.current?.show({
         severity: "error",
         summary: "Error",
-        detail:
-          error?.response?.data?.message ?? "Failed to load purchase orders",
+        detail: error?.response?.data?.message ?? "Failed to load purchase orders",
         life: 3000,
       });
     } finally {
-      if (requestId === requestIdRef.current) {
-        setLoading(false);
-      }
+      if (requestId === requestIdRef.current) setLoading(false);
     }
   }, [page, rows, debouncedSearch]);
 
   const loadDashboard = useCallback(async () => {
     try {
       const dashboard = await getAdminDashboard();
-
       setStats(dashboard.poSummary);
     } catch (error) {
       console.error(error);
     }
   }, []);
 
-  useEffect(() => {
-    loadPurchaseOrders();
-  }, [loadPurchaseOrders]);
+  useEffect(() => { loadPurchaseOrders(); }, [loadPurchaseOrders]);
+  useEffect(() => { loadDashboard(); },      [loadDashboard]);
 
-  useEffect(() => {
-    loadDashboard();
-  }, [loadDashboard]);
+  // ── Handlers ────────────────────────────────────────────────────────────────
 
-  const handleView = (po: PurchaseOrder) => {
+  const handleView = useCallback((po: PurchaseOrder) => {
     setSelectedPO(po);
     setViewDialogVisible(true);
-  };
+  }, []);
+
+  const lineItemColumns = buildLineItemColumns(handleView);
 
   const rowExpansionTemplate = (group: POGroup) => (
-    <div className="px-4 pb-4 pt-2">
-      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
-        Line Items — {group.poNo}
-      </p>
-
-      <DataTable
-        value={group.lineItems}
-        size="small"
-        showGridlines
-        dataKey="id"
-      >
-        <Column field="poItem" header="Item #" />
-        <Column field="batch" header="Batch" />
-        <Column field="matCode" header="Material Code" />
-        <Column field="matDesc" header="Description" />
-        <Column field="actQty" header="Quantity" />
-        <Column field="vendorNo" header="Vendor No" />
-        <Column field="soldTo" header="Sold To" />
-        <Column field="incoterm1" header="Incoterm 1" />
-        <Column field="incoterm2" header="Incoterm 2" />
-        <Column field="odpoQuan" header="odpoQuan" />
-
-        <Column
-          field="status"
-          header="Status"
-          body={(row: PurchaseOrder) => <StatusBadge status={row.status} />}
-        />
-
-        <Column
-          header="Actions"
-          body={(row: PurchaseOrder) => (
-            <Button
-              icon="pi pi-eye"
-              text
-              rounded
-              onClick={() => handleView(row)}
-            />
-          )}
-        />
-      </DataTable>
-    </div>
+    <ExpandedTable<PurchaseOrder>
+      title={`Line Items — ${group.poNo}`}
+      data={group.lineItems}
+      columns={lineItemColumns}
+    />
   );
 
+  // ─── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="page-container py-6 space-y-6">
       <Toast ref={toast} />
 
-      {/* HEADER */}
-
+      {/* Header */}
       <div>
         <h1 className="text-2xl font-bold">Purchase Orders</h1>
         <p className="text-sm text-muted-foreground">
@@ -167,26 +161,13 @@ export default function AdminPurchaseOrdersPage() {
         </p>
       </div>
 
-      {/* KPI */}
-
+      {/* KPI Cards */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         {[
-          {
-            label: "Total PO Lines",
-            value: stats.totalPOLines,
-          },
-          {
-            label: "Open",
-            value: stats.open,
-          },
-          {
-            label: "In Progress",
-            value: stats.inProgress,
-          },
-          {
-            label: "Completed",
-            value: stats.completed,
-          },
+          { label: "Total PO Lines", value: stats.totalPOLines },
+          { label: "Open",           value: stats.open },
+          { label: "In Progress",    value: stats.inProgress },
+          { label: "Completed",      value: stats.completed },
         ].map((card) => (
           <div key={card.label} className="card p-5">
             <p className="text-sm text-muted-foreground">{card.label}</p>
@@ -195,69 +176,53 @@ export default function AdminPurchaseOrdersPage() {
         ))}
       </div>
 
-      {/* GROUPED TABLE */}
-      <div className="card overflow-hidden">
-        <div className="flex justify-end px-4 py-3 border-b border-border">
-          <InputText
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-            placeholder="Search PO number, material, vendor..."
-            className="w-full md:w-80"
-          />
-        </div>
-        <DataTable
-          value={poGroups}
-          dataKey="poNo"
-          loading={loading}
-          expandedRows={expandedRows}
-          onRowToggle={(e) =>
-            setExpandedRows(e.data as Record<string, boolean>)
-          }
-          rowExpansionTemplate={rowExpansionTemplate}
-          paginator
-          lazy
-          rows={rows}
-          totalRecords={totalRecords}
-          first={(page - 1) * rows}
-          onPage={(e: any) => {
-            setPage(e.page + 1);
-            setRows(e.rows);
-          }}
-          emptyMessage="No purchase orders found"
-        >
-          <Column expander style={{ width: "4rem" }} />
+      {/* Grouped Table — dataKey="poNo" so each PO row is tracked individually */}
+      <AppTable<POGroup>
+        key={tableKey}
+        data={poGroups}
+        loading={loading}
+        lazy
+        dataKey="poNo"
+        rows={rows}
+        first={first}
+        totalRecords={totalRecords}
+        globalSearch
+        onSearchChange={(val) => setSearch(val)}
+        onPageChange={(e: any) => {
+          setPage(e.page + 1);
+          setRows(e.rows);
+          setFirst(e.first);
+        }}
+        rowExpansionTemplate={rowExpansionTemplate}
+        expandableWhen={(group) => (group.lineItems?.length ?? 0) > 0}
+        columns={[
+          { field: "poNo",              header: "PO Number" },
+          { field: "lineCount",         header: "Lines" },
+          { field: "vendorNo",          header: "Vendor No" },
+          { field: "soldTo",            header: "Sold To" },
+          {
+            field: "poType",
+            header: "PO Type",
+            body: (row: POGroup) => <span>{row.poType ?? "-"}</span>,
+          },
+          { field: "totalQty",          header: "Total Qty" },
+          // { field: "deliveredQty",      header: "Delivered" },
+          // { field: "fulfillmentStatus", header: "Fulfillment Status" },
+          {
+            field: "updatedAt",
+            header: "Updated",
+            body: (row: POGroup) => (
+              <span>
+                {row.updatedAt
+                  ? new Date(row.updatedAt).toLocaleDateString()
+                  : "-"}
+              </span>
+            ),
+          },
+        ]}
+      />
 
-          <Column field="poNo" header="PO Number" />
-
-          <Column field="lineCount" header="Lines" />
-
-          <Column field="vendorNo" header="Vendor No" />
-
-          <Column field="soldTo" header="Sold To" />
-
-          <Column
-            header="PO Type"
-            body={(row) => row.poType ?? "-"}
-          />
-          <Column field="totalQty" header="Total Qty" />
-          <Column field="deliveredQty" header="Delivered" />
-          <Column field="fulfillmentStatus" header="Fulfillment Status" />
-
-          <Column
-            field="updatedAt"
-            header="Updated"
-            body={(row: POGroup) =>
-              row.updatedAt ? new Date(row.updatedAt).toLocaleDateString() : "-"
-            }
-          />
-        </DataTable>
-      </div>
-
-      {/* VIEW DIALOG */}
-
+      {/* View Dialog */}
       <Dialog
         header={`PO ${selectedPO?.poNo}`}
         visible={viewDialogVisible}
@@ -267,45 +232,16 @@ export default function AdminPurchaseOrdersPage() {
       >
         {selectedPO && (
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <strong>PO Number:</strong> {selectedPO.poNo}
-            </div>
-
-            <div>
-              <strong>PO Item:</strong> {selectedPO.poItem}
-            </div>
-
-            <div>
-              <strong>Material Code:</strong> {selectedPO.matCode}
-            </div>
-
-            <div>
-              <strong>Description:</strong> {selectedPO.matDesc}
-            </div>
-
-            <div>
-              <strong>Quantity:</strong> {selectedPO.actQty}
-            </div>
-
-            <div>
-              <strong>Status:</strong> {selectedPO.status}
-            </div>
-
-            <div>
-              <strong>Vendor:</strong> {selectedPO.vendorNo}
-            </div>
-
-            <div>
-              <strong>Batch:</strong> {selectedPO.batch}
-            </div>
-
-            <div>
-              <strong>Incoterm 1:</strong> {selectedPO.incoterm1}
-            </div>
-
-            <div>
-              <strong>odpoQuan:</strong> {selectedPO.odpoQuan}
-            </div>
+            <div><strong>PO Number:</strong> {selectedPO.poNo}</div>
+            <div><strong>PO Item:</strong> {selectedPO.poItem}</div>
+            <div><strong>Material Code:</strong> {selectedPO.matCode}</div>
+            <div><strong>Description:</strong> {selectedPO.matDesc}</div>
+            <div><strong>Quantity:</strong> {selectedPO.actQty}</div>
+            <div><strong>Status:</strong> {selectedPO.status}</div>
+            <div><strong>Vendor:</strong> {selectedPO.vendorNo}</div>
+            <div><strong>Batch:</strong> {selectedPO.batch}</div>
+            <div><strong>Incoterm 1:</strong> {selectedPO.incoterm1}</div>
+            <div><strong>odpoQuan:</strong> {selectedPO.odpoQuan}</div>
           </div>
         )}
       </Dialog>

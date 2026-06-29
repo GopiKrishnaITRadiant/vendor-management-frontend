@@ -7,7 +7,7 @@ import { Password } from "primereact/password";
 import { Toast } from "primereact/toast";
 import { ConfirmDialog, confirmDialog } from "primereact/confirmdialog";
 import AppTable from "../../components/table/DataTable";
-import { useDebounce } from "../../hooks/DebounceHook";
+import { useDebounce } from "../../hooks/debounceHook";
 import {
   getAllUsers,
   getUserCounts,
@@ -16,7 +16,7 @@ import {
   activateUser,
   resendVerification,
   setupVendor,
-} from "../../services/usersService";
+} from "../../services/UsersService";
 
 type UserStatus = "active" | "inactive" | "suspended" | "pending_verification";
 
@@ -35,7 +35,7 @@ type Vendor = {
   updatedAt: string;
 };
 
-type EditableVendorFields = any
+type EditableVendorFields = any;
 
 const STATUS_OPTIONS = [
   { label: "Active", value: "active" },
@@ -58,20 +58,14 @@ const emptyVendorForm: Partial<EditableVendorFields> = {
   status: "pending_verification",
 };
 
-// ── Password generator ─────────────────────────────────
-// Generates a secure 12-char password client-side for the
-// admin to review before sending. Backend re-validates
-// against the same rules on submit.
 function generatePassword(): string {
-  const upper   = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  const lower   = "abcdefghijklmnopqrstuvwxyz";
-  const digits  = "0123456789";
+  const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const lower = "abcdefghijklmnopqrstuvwxyz";
+  const digits = "0123456789";
   const special = "@#$!%*?&";
-  const all     = upper + lower + digits + special;
-
+  const all = upper + lower + digits + special;
   const rand = (chars: string) =>
     chars[Math.floor(Math.random() * chars.length)];
-
   const chars = [
     rand(upper),
     rand(lower),
@@ -79,13 +73,10 @@ function generatePassword(): string {
     rand(special),
     ...Array.from({ length: 8 }, () => rand(all)),
   ];
-
-  // Shuffle
   for (let i = chars.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [chars[i], chars[j]] = [chars[j], chars[i]];
   }
-
   return chars.join("");
 }
 
@@ -97,6 +88,7 @@ export default function AdminVendorManagementPage() {
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [rows, setRows] = useState(10);
+  const [first, setFirst] = useState(0);
   const [totalRecords, setTotalRecords] = useState(0);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 500);
@@ -119,19 +111,18 @@ export default function AdminVendorManagementPage() {
     useState<Partial<EditableVendorFields>>(emptyVendorForm);
   const [actionLoading, setActionLoading] = useState(false);
 
-  // ── Setup Vendor dialog state (generate password + send) ──
   const [setupDialogVisible, setSetupDialogVisible] = useState(false);
-  const [setupVendorTarget,  setSetupVendorTarget]  = useState<Vendor | null>(null);
-  const [setupEmail,         setSetupEmail]         = useState("");
-  const [setupPassword,      setSetupPassword]      = useState("");
-  const [setupSending,       setSetupSending]       = useState(false);
+  const [setupVendorTarget, setSetupVendorTarget] = useState<Vendor | null>(
+    null,
+  );
+  const [setupEmail, setSetupEmail] = useState("");
+  const [setupPassword, setSetupPassword] = useState("");
+  const [setupSending, setSetupSending] = useState(false);
 
-  const vendorsRequestId = useRef(0);
   const countsFetchedOnce = useRef(false);
 
+  // ── Load vendors ──────────────────────────────────────
   const loadVendors = useCallback(async () => {
-    const requestId = ++vendorsRequestId.current;
-
     try {
       setLoading(true);
       const response = await getAllUsers(
@@ -141,13 +132,9 @@ export default function AdminVendorManagementPage() {
         "vendor",
         statusFilter ?? undefined,
       );
-
-      if (requestId !== vendorsRequestId.current) return;
-
       setVendors(response.data);
       setTotalRecords(response.total);
     } catch (error: any) {
-      if (requestId !== vendorsRequestId.current) return;
       toast.current?.show({
         severity: "error",
         summary: "Error",
@@ -155,7 +142,7 @@ export default function AdminVendorManagementPage() {
         life: 3000,
       });
     } finally {
-      if (requestId === vendorsRequestId.current) setLoading(false);
+      setLoading(false);
     }
   }, [page, rows, debouncedSearch, statusFilter]);
 
@@ -177,8 +164,10 @@ export default function AdminVendorManagementPage() {
     }
   }, []);
 
+  // ── Reset to page 1 on filter/search change ───────────
   useEffect(() => {
     setPage(1);
+    setFirst(0);
   }, [debouncedSearch, statusFilter]);
 
   useEffect(() => {
@@ -191,7 +180,7 @@ export default function AdminVendorManagementPage() {
     loadCounts();
   }, [loadCounts]);
 
-  // ── View / Edit handlers ──────────────────────────────
+  // ── Handlers ──────────────────────────────────────────
 
   const handleView = (v: Vendor) => {
     setSelectedVendor(v);
@@ -209,18 +198,23 @@ export default function AdminVendorManagementPage() {
     setFormDialogVisible(true);
   };
 
-  // ── Setup Vendor: generate password + edit email + send ─
-
   const openSetupDialog = (v: Vendor) => {
     setSetupVendorTarget(v);
-    // Pre-fill email only if it isn't the placeholder pattern
     setSetupEmail(v.email.endsWith("@pending.internal") ? "" : v.email);
     setSetupPassword(generatePassword());
     setSetupDialogVisible(true);
   };
 
-  const regeneratePassword = () => {
-    setSetupPassword(generatePassword());
+  const regeneratePassword = () => setSetupPassword(generatePassword());
+
+  const copyPasswordToClipboard = () => {
+    navigator.clipboard.writeText(setupPassword);
+    toast.current?.show({
+      severity: "info",
+      summary: "Copied",
+      detail: "Password copied to clipboard.",
+      life: 2000,
+    });
   };
 
   const submitSetupVendor = async () => {
@@ -235,9 +229,7 @@ export default function AdminVendorManagementPage() {
       });
       return;
     }
-
-    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailPattern.test(setupEmail.trim())) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(setupEmail.trim())) {
       toast.current?.show({
         severity: "error",
         summary: "Validation",
@@ -246,7 +238,6 @@ export default function AdminVendorManagementPage() {
       });
       return;
     }
-
     if (!setupPassword.trim()) {
       toast.current?.show({
         severity: "error",
@@ -259,33 +250,26 @@ export default function AdminVendorManagementPage() {
 
     try {
       setSetupSending(true);
-
-      // Backend: sets real email + password (hashed), flips status to ACTIVE,
-      // and sends the credentials directly to the vendor's email.
       const updated = await setupVendor(setupVendorTarget.id, {
         email: setupEmail.trim().toLowerCase(),
         password: setupPassword,
       });
-
       setVendors((prev) =>
         prev.map((v) =>
           v.id === setupVendorTarget.id ? { ...v, ...updated } : v,
         ),
       );
-
       setCounts((c) => ({
         ...c,
         pending: Math.max(0, c.pending - 1),
         active: c.active + 1,
       }));
-
       toast.current?.show({
         severity: "success",
         summary: "Vendor Activated",
         detail: `Credentials sent to ${setupEmail.trim()}.`,
         life: 4000,
       });
-
       setSetupDialogVisible(false);
     } catch (error: any) {
       toast.current?.show({
@@ -298,18 +282,6 @@ export default function AdminVendorManagementPage() {
       setSetupSending(false);
     }
   };
-
-  const copyPasswordToClipboard = () => {
-    navigator.clipboard.writeText(setupPassword);
-    toast.current?.show({
-      severity: "info",
-      summary: "Copied",
-      detail: "Password copied to clipboard.",
-      life: 2000,
-    });
-  };
-
-  // ── Suspend / Reactivate / Resend ─────────────────────
 
   const handleSuspend = (v: Vendor) => {
     confirmDialog({
@@ -325,7 +297,6 @@ export default function AdminVendorManagementPage() {
     try {
       setActionLoading(true);
       await suspendUser(v.id);
-
       setVendors((prev) =>
         prev.map((vendor) =>
           vendor.id === v.id
@@ -333,13 +304,11 @@ export default function AdminVendorManagementPage() {
             : vendor,
         ),
       );
-
       setCounts((c) => ({
         ...c,
         active: Math.max(0, c.active - (v.status === "active" ? 1 : 0)),
         suspended: c.suspended + 1,
       }));
-
       toast.current?.show({
         severity: "warn",
         summary: "Suspended",
@@ -372,7 +341,6 @@ export default function AdminVendorManagementPage() {
     try {
       setActionLoading(true);
       await activateUser(v.id);
-
       setVendors((prev) =>
         prev.map((vendor) =>
           vendor.id === v.id
@@ -380,13 +348,14 @@ export default function AdminVendorManagementPage() {
             : vendor,
         ),
       );
-
       setCounts((c) => ({
         ...c,
         active: c.active + 1,
-        suspended: Math.max(0, c.suspended - (v.status === "suspended" ? 1 : 0)),
+        suspended: Math.max(
+          0,
+          c.suspended - (v.status === "suspended" ? 1 : 0),
+        ),
       }));
-
       toast.current?.show({
         severity: "success",
         summary: "Activated",
@@ -405,28 +374,6 @@ export default function AdminVendorManagementPage() {
     }
   };
 
-  const handleResendVerification = async (v: Vendor) => {
-    try {
-      setActionLoading(true);
-      await resendVerification(v.email);
-      toast.current?.show({
-        severity: "info",
-        summary: "Sent",
-        detail: `Verification email resent to ${v.email}.`,
-        life: 3000,
-      });
-    } catch (error: any) {
-      toast.current?.show({
-        severity: "error",
-        summary: "Error",
-        detail: error?.response?.data?.message ?? "Failed to resend verification",
-        life: 3000,
-      });
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
   const handleSave = async () => {
     if (!editingVendor.firstName?.trim() || !editingVendor.lastName?.trim()) {
       toast.current?.show({
@@ -437,17 +384,16 @@ export default function AdminVendorManagementPage() {
       });
       return;
     }
-
     if (!selectedVendor) return;
 
     try {
       setActionLoading(true);
       const updated = await updateUser(selectedVendor.id, editingVendor);
-
       setVendors((prev) =>
-        prev.map((v) => (v.id === selectedVendor.id ? { ...v, ...updated } : v)),
+        prev.map((v) =>
+          v.id === selectedVendor.id ? { ...v, ...updated } : v,
+        ),
       );
-
       toast.current?.show({
         severity: "success",
         summary: "Updated",
@@ -468,30 +414,44 @@ export default function AdminVendorManagementPage() {
   };
 
   const set = (field: keyof EditableVendorFields, value: any) =>
-    setEditingVendor((prev) => ({ ...prev, [field]: value }));
+    setEditingVendor((prev: any) => ({ ...prev, [field]: value }));
 
   const isPlaceholderEmail = (email: string) =>
     email.endsWith("@pending.internal");
+
+  // ── Render ────────────────────────────────────────────
 
   return (
     <div className="page-container py-6 space-y-6">
       <Toast ref={toast} />
       <ConfirmDialog />
 
+      {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Vendor Management</h1>
+        <h1 className="text-2xl font-bold text-foreground">
+          Vendor Management
+        </h1>
         <p className="text-sm text-muted-foreground mt-1">
           Vendor accounts are auto-provisioned from SAP purchase order sync.
         </p>
       </div>
 
+      {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         {[
-          { label: "Total Vendors", value: counts.total,     color: "text-foreground" },
-          { label: "Active",        value: counts.active,    color: "text-success" },
-          { label: "Inactive",      value: counts.inactive,  color: "text-muted-foreground" },
-          { label: "Suspended",     value: counts.suspended, color: "text-danger" },
-          { label: "Pending",       value: counts.pending,   color: "text-warning" },
+          {
+            label: "Total Vendors",
+            value: counts.total,
+            color: "text-foreground",
+          },
+          { label: "Active", value: counts.active, color: "text-success" },
+          {
+            label: "Inactive",
+            value: counts.inactive,
+            color: "text-muted-foreground",
+          },
+          { label: "Suspended", value: counts.suspended, color: "text-danger" },
+          { label: "Pending", value: counts.pending, color: "text-warning" },
         ].map((c) => (
           <div key={c.label} className="card p-5">
             <p className="text-sm text-muted-foreground">{c.label}</p>
@@ -502,6 +462,7 @@ export default function AdminVendorManagementPage() {
         ))}
       </div>
 
+      {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
         <Dropdown
           value={statusFilter}
@@ -511,24 +472,31 @@ export default function AdminVendorManagementPage() {
           className="w-56"
         />
         {statusFilter && (
-          <Button label="Clear" text icon="pi pi-times" onClick={() => setStatusFilter(null)} />
+          <Button
+            label="Clear"
+            text
+            icon="pi pi-times"
+            onClick={() => setStatusFilter(null)}
+          />
         )}
       </div>
 
+      {/* Table — lazy because API paginates server-side */}
       <AppTable
         data={vendors}
         loading={loading}
-        onView={handleView}
-        // onEdit={handleEdit}
-        totalRecords={totalRecords}
-        // page={page}
+        lazy
         rows={rows}
+        first={first}
+        totalRecords={totalRecords}
+        globalSearch
+        onSearchChange={setSearch}
+        onView={handleView}
         onPageChange={(e: any) => {
           setPage(e.page + 1);
           setRows(e.rows);
+          setFirst(e.first);
         }}
-        // search={search}
-        onSearchChange={setSearch}
         columns={[
           { field: "id", header: "ID", sortable: true },
           {
@@ -544,12 +512,19 @@ export default function AdminVendorManagementPage() {
             filter: true,
             body: (row: Vendor) =>
               isPlaceholderEmail(row.email) ? (
-                <span className="text-amber-600 italic text-sm">Not set up yet</span>
+                <span className="text-amber-600 italic text-sm">
+                  Not set up yet
+                </span>
               ) : (
                 row.email
               ),
           },
-          { field: "sapVendorId", header: "SAP Vendor ID", sortable: true, filter: true },
+          {
+            field: "sapVendorId",
+            header: "SAP Vendor ID",
+            sortable: true,
+            filter: true,
+          },
           {
             field: "status",
             header: "Status",
@@ -558,7 +533,9 @@ export default function AdminVendorManagementPage() {
             body: (row: Vendor) => {
               const badge = STATUS_BADGE[row.status];
               return (
-                <span className={`text-xs font-medium px-2 py-1 rounded-full ${badge.className}`}>
+                <span
+                  className={`text-xs font-medium px-2 py-1 rounded-full ${badge.className}`}
+                >
                   {badge.label}
                 </span>
               );
@@ -567,69 +544,28 @@ export default function AdminVendorManagementPage() {
           {
             field: "isEmailVerified",
             header: "Email Verified",
-            body: (row: Vendor) => (row.isEmailVerified ? "Verified" : "Unverified"),
+            body: (row: Vendor) =>
+              row.isEmailVerified ? "Verified" : "Unverified",
           },
           {
             field: "lastLoginAt",
             header: "Last Login",
             sortable: true,
             body: (row: Vendor) =>
-              row.lastLoginAt ? new Date(row.lastLoginAt).toLocaleString() : "Never",
+              row.lastLoginAt
+                ? new Date(row.lastLoginAt).toLocaleString()
+                : "Never",
           },
-          // {
-          //   field: "actions",
-          //   header: "Actions",
-          //   body: (row: Vendor) => (
-          //     <div className="flex gap-2">
-          //       {row.status === "pending_verification" && (
-          //         <Button
-          //           label="Setup"
-          //           icon="pi pi-key"
-          //           severity="warning"
-          //           size="small"
-          //           tooltip="Generate password & send credentials"
-          //           onClick={() => openSetupDialog(row)}
-          //         />
-          //       )}
-          //       {row.status === "active" && (
-          //         <Button
-          //           icon="pi pi-ban"
-          //           severity="danger"
-          //           size="small"
-          //           text
-          //           tooltip="Suspend"
-          //           onClick={() => handleSuspend(row)}
-          //         />
-          //       )}
-          //       {row.status === "suspended" && (
-          //         <Button
-          //           icon="pi pi-check-circle"
-          //           severity="success"
-          //           size="small"
-          //           text
-          //           tooltip="Reactivate"
-          //           onClick={() => handleReactivate(row)}
-          //         />
-          //       )}
-          //       {!row.isEmailVerified && !isPlaceholderEmail(row.email) && (
-          //         <Button
-          //           icon="pi pi-envelope"
-          //           severity="info"
-          //           size="small"
-          //           text
-          //           tooltip="Resend Verification"
-          //           onClick={() => handleResendVerification(row)}
-          //         />
-          //       )}
-          //     </div>
-          //   ),
-          // },
         ]}
       />
 
-      {/* VIEW DIALOG */}
+      {/* View Dialog */}
       <Dialog
-        header={selectedVendor ? `${selectedVendor.firstName} ${selectedVendor.lastName}` : ""}
+        header={
+          selectedVendor
+            ? `${selectedVendor.firstName} ${selectedVendor.lastName}`
+            : ""
+        }
         visible={viewDialogVisible}
         onHide={() => setViewDialogVisible(false)}
         style={{ width: "520px" }}
@@ -642,46 +578,79 @@ export default function AdminVendorManagementPage() {
                 { label: "First Name", value: selectedVendor.firstName },
                 { label: "Last Name", value: selectedVendor.lastName },
                 { label: "Email", value: selectedVendor.email },
-                { label: "SAP Vendor ID", value: selectedVendor.sapVendorId ?? "—" },
-                { label: "Status", value: STATUS_BADGE[selectedVendor.status]?.label },
-                { label: "Email Verified", value: selectedVendor.isEmailVerified ? "Yes" : "No" },
-                { label: "First Login Done", value: selectedVendor.isFirstLoginVerified ? "Yes" : "No" },
+                {
+                  label: "SAP Vendor ID",
+                  value: selectedVendor.sapVendorId ?? "—",
+                },
+                {
+                  label: "Status",
+                  value: STATUS_BADGE[selectedVendor.status]?.label,
+                },
+                {
+                  label: "Email Verified",
+                  value: selectedVendor.isEmailVerified ? "Yes" : "No",
+                },
+                {
+                  label: "First Login Done",
+                  value: selectedVendor.isFirstLoginVerified ? "Yes" : "No",
+                },
                 {
                   label: "Last Login",
                   value: selectedVendor.lastLoginAt
                     ? new Date(selectedVendor.lastLoginAt).toLocaleString()
                     : "Never",
                 },
-                { label: "Last Login IP", value: selectedVendor.lastLoginIp ?? "—" },
-                { label: "Created At", value: new Date(selectedVendor.createdAt).toLocaleDateString() },
+                {
+                  label: "Last Login IP",
+                  value: selectedVendor.lastLoginIp ?? "—",
+                },
+                {
+                  label: "Created At",
+                  value: new Date(
+                    selectedVendor.createdAt,
+                  ).toLocaleDateString(),
+                },
               ].map((f) => (
                 <div key={f.label}>
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">{f.label}</p>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                    {f.label}
+                  </p>
                   <p className="font-medium">{f.value}</p>
                 </div>
               ))}
             </div>
             <div className="flex justify-end gap-2 pt-2 border-t border-border">
-              <Button label="Close" outlined severity="secondary" onClick={() => setViewDialogVisible(false)} />
+              <Button
+                label="Close"
+                outlined
+                severity="secondary"
+                onClick={() => setViewDialogVisible(false)}
+              />
               {selectedVendor.status === "pending_verification" && (
                 <Button
                   label="Setup Vendor"
                   icon="pi pi-key"
                   severity="warning"
-                  onClick={() => { setViewDialogVisible(false); openSetupDialog(selectedVendor); }}
+                  onClick={() => {
+                    setViewDialogVisible(false);
+                    openSetupDialog(selectedVendor);
+                  }}
                 />
               )}
               <Button
                 label="Edit"
                 icon="pi pi-pencil"
-                onClick={() => { setViewDialogVisible(false); handleEdit(selectedVendor); }}
+                onClick={() => {
+                  setViewDialogVisible(false);
+                  handleEdit(selectedVendor);
+                }}
               />
             </div>
           </div>
         )}
       </Dialog>
 
-      {/* EDIT DIALOG */}
+      {/* Edit Dialog */}
       <Dialog
         header={`Edit — ${editingVendor.firstName ?? ""} ${editingVendor.lastName ?? ""}`}
         visible={formDialogVisible}
@@ -692,31 +661,68 @@ export default function AdminVendorManagementPage() {
         <div className="space-y-4 pt-2">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-foreground">First Name *</label>
-              <InputText value={editingVendor.firstName ?? ""} onChange={(e) => set("firstName", e.target.value)} placeholder="First name" />
+              <label className="text-sm font-medium text-foreground">
+                First Name *
+              </label>
+              <InputText
+                value={editingVendor.firstName ?? ""}
+                onChange={(e) => set("firstName", e.target.value)}
+                placeholder="First name"
+              />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-foreground">Last Name *</label>
-              <InputText value={editingVendor.lastName ?? ""} onChange={(e) => set("lastName", e.target.value)} placeholder="Last name" />
+              <label className="text-sm font-medium text-foreground">
+                Last Name *
+              </label>
+              <InputText
+                value={editingVendor.lastName ?? ""}
+                onChange={(e) => set("lastName", e.target.value)}
+                placeholder="Last name"
+              />
             </div>
             <div className="flex flex-col gap-1.5 md:col-span-2">
-              <label className="text-sm font-medium text-foreground">Email *</label>
-              <InputText value={editingVendor.email ?? ""} onChange={(e) => set("email", e.target.value)} placeholder="vendor@example.com" />
-              <p className="text-xs text-muted-foreground">Changing this will require the vendor to re-verify their email.</p>
+              <label className="text-sm font-medium text-foreground">
+                Email *
+              </label>
+              <InputText
+                value={editingVendor.email ?? ""}
+                onChange={(e) => set("email", e.target.value)}
+                placeholder="vendor@example.com"
+              />
+              <p className="text-xs text-muted-foreground">
+                Changing this will require the vendor to re-verify their email.
+              </p>
             </div>
             <div className="flex flex-col gap-1.5 md:col-span-2">
-              <label className="text-sm font-medium text-foreground">Status</label>
-              <Dropdown value={editingVendor.status} options={STATUS_OPTIONS} onChange={(e) => set("status", e.value)} />
+              <label className="text-sm font-medium text-foreground">
+                Status
+              </label>
+              <Dropdown
+                value={editingVendor.status}
+                options={STATUS_OPTIONS}
+                onChange={(e) => set("status", e.value)}
+              />
             </div>
           </div>
           <div className="flex justify-end gap-2 pt-2 border-t border-border">
-            <Button label="Cancel" outlined severity="secondary" onClick={() => setFormDialogVisible(false)} disabled={actionLoading} />
-            <Button label="Update" icon="pi pi-check" loading={actionLoading} onClick={handleSave} />
+            <Button
+              label="Cancel"
+              outlined
+              severity="secondary"
+              onClick={() => setFormDialogVisible(false)}
+              disabled={actionLoading}
+            />
+            <Button
+              label="Update"
+              icon="pi pi-check"
+              loading={actionLoading}
+              onClick={handleSave}
+            />
           </div>
         </div>
       </Dialog>
 
-      {/* SETUP VENDOR DIALOG — generate password + set email + send */}
+      {/* Setup Vendor Dialog */}
       <Dialog
         header={`Setup Vendor — ${setupVendorTarget?.sapVendorId ?? ""}`}
         visible={setupDialogVisible}
@@ -727,13 +733,15 @@ export default function AdminVendorManagementPage() {
         {setupVendorTarget && (
           <div className="space-y-4 pt-2">
             <p className="text-sm text-muted-foreground">
-              This vendor account was auto-created from SAP sync and has no
-              real email or password yet. Enter the vendor's email, generate
-              a password, then send the credentials.
+              This vendor account was auto-created from SAP sync and has no real
+              email or password yet. Enter the vendor's email, generate a
+              password, then send the credentials.
             </p>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-foreground">Vendor Email *</label>
+              <label className="text-sm font-medium text-foreground">
+                Vendor Email *
+              </label>
               <InputText
                 value={setupEmail}
                 onChange={(e) => setSetupEmail(e.target.value)}
@@ -743,7 +751,9 @@ export default function AdminVendorManagementPage() {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-foreground">Generated Password</label>
+              <label className="text-sm font-medium text-foreground">
+                Generated Password
+              </label>
               <div className="flex gap-2">
                 <Password
                   value={setupPassword}
@@ -769,8 +779,8 @@ export default function AdminVendorManagementPage() {
                 />
               </div>
               <p className="text-xs text-muted-foreground">
-                This password will be emailed directly to the vendor. The
-                vendor will verify via OTP on first login.
+                This password will be emailed directly to the vendor. The vendor
+                will verify via OTP on first login.
               </p>
             </div>
 

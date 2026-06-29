@@ -24,6 +24,7 @@ import AdminUsersRolesPage from "./pages/Admin/AdminUserRoles";
 import ProtectedRoute from "./routes/ProtectedRoutes";
 import AdminProfile from "./pages/Admin/AdminProfile";
 import AdminSettings from "./pages/Admin/AdminSettings";
+import SAPSyncLogsPage from "./pages/Admin/SAPSyncLogsPage";
 
 //Root redirect — waits for the silent /auth/refresh bootstrap
 function RootRedirect() {
@@ -71,6 +72,7 @@ function AppRoutes() {
             <Route index element={<AdminDashboardPage />} />
             <Route path="asn-approvals" element={<AdminASNApprovalsPage />} />
             <Route path="purchase-orders" element={<AdminPurchaseOrdersPage />} />
+            <Route path="sap-sync-logs" element={<SAPSyncLogsPage />} />
             <Route path="vendors" element={<AdminVendorManagementPage />} />
             <Route path="users" element={<AdminUsersRolesPage />} />
             <Route  path= "profile" element={ <AdminProfile /> }/>

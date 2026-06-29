@@ -7,7 +7,7 @@ import { ASNDetailDialog, StatusBadge } from "../../components/dialogs/AsnDetail
 
 import { getAllASNs, submitASN } from "../../services/ASNService";
 import { useAuth } from "../../context/AuthContext";
-import { useDebounce } from "../../hooks/DebounceHook";
+import { useDebounce } from "../../hooks/debounceHook";
 
 import type { ASN, ASNStatus } from "../../types/asnTypes";
 

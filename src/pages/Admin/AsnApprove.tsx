@@ -6,7 +6,7 @@ import { InputTextarea } from "primereact/inputtextarea";
 import { ConfirmDialog, confirmDialog } from "primereact/confirmdialog";
 import { Toast } from "primereact/toast";
 import AppTable from "../../components/table/DataTable";
-import { useDebounce } from "../../hooks/DebounceHook";
+import { useDebounce } from "../../hooks/debounceHook";
 import {
   approveASN,
   rejectASN,
@@ -342,7 +342,7 @@ export default function AdminASNApprovalsPage() {
         totalRecords={totalRecords}
         // page={page}
         rows={rows}
-        onPageChange={(e) => {
+        onPageChange={(e:any) => {
           setPage(e.page + 1);
           setRows(e.rows);
         }}
