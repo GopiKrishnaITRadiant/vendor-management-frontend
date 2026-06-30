@@ -1,0 +1,1 @@
+export type UserStatus = "active" | "inactive" | "suspended" | "pending_verification";

@@ -1,133 +1,74 @@
-import { useRef, useState, useEffect, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect, useMemo } from "react";
 import { Button } from "primereact/button";
 import { Dialog } from "primereact/dialog";
 import { Dropdown } from "primereact/dropdown";
 import { InputTextarea } from "primereact/inputtextarea";
 import { ConfirmDialog, confirmDialog } from "primereact/confirmdialog";
 import { Toast } from "primereact/toast";
-import AppTable from "../../components/table/DataTable";
-import { useDebounce } from "../../hooks/debounceHook";
+import AppTable from "../../../components/table/DataTable";
+import { usePaginatedQuery } from "../../../hooks/usePaginatedQuery";
 import {
   approveASN,
   rejectASN,
   getASNStatusCounts,
   getAllAdminASNs,
-} from "../../services/ASNService";
+} from "../../../services/ASNService";
+import type { ASN, ASNStatus, StatusCounts } from "../../../types/asnTypes";
+import { STATUS_BADGE, STATUS_OPTIONS } from "./constants";
 
-export type ASNStatus =
-  | "draft"
-  | "submitted"
-  | "confirmed"
-  | "rejected"
-  | "shipped"
-  | "delivered"
-  | "cancelled";
-
-export type ASNItem = {
-  id:               number;
-  poNo:             string;
-  poItem:           string;
-  matCode:          string;
-  matDesc:          string;
-  ndcCode:          string;
-  originalQty:       number;
-  submittedQty:     number;
-  availableQty:   number;
-  uom:              string;
-  batchNo:          string;
-  manufactureDate:  string | null;
-  expiryDate:       string | null;
-  numberOfPackages: number;
-  packageType:      string;
-  grossWeight:      string;
-  weightUnit:       string;
-  upsWarehouseId:   string;
-};
-
-export type ASN = {
-  id:                    number;
-  asnNumber:             string;
-  poNo:                  string;
-  vendorId:              number;
-  soldTo:                string;
-  status:                ASNStatus;
-  estimatedShipDate:     string;
-  estimatedDeliveryDate: string;
-  actualShipDate:        string | null;
-  actualDeliveryDate:    string | null;
-  carrierName:           string;
-  trackingNumber:        string;
-  shipmentMode:          string | null;
-  validationErrors:      { field: string; message: string }[] | null;
-  rejectionReason:       string | null;
-  notes:                 string | null;
-  submittedAt:           string | null;
-  confirmedAt:           string | null;
-  createdAt:             string;
-  updatedAt:             string;
-  shipFromAddress:       any | null;
-  items:                 ASNItem[];
-};
-
-export type StatusCounts = {
-  total:       number;
-  pending:     number;  // submitted + confirmed
-  approved:    number;  // confirmed + shipped + delivered
-  rejected:    number;
-};
-
-
-const STATUS_OPTIONS = [
-  // { label: "All",       value: null },
-  { label: "Draft",     value: "draft" },
-  { label: "Submitted", value: "submitted" },
-  { label: "Confirmed", value: "confirmed" },
-  { label: "Rejected",  value: "rejected" },
-  { label: "Shipped",   value: "shipped" },
-  { label: "Delivered", value: "delivered" },
-  { label: "Cancelled", value: "cancelled" },
-];
-
-const STATUS_BADGE: Record<ASNStatus, { label: string; className: string }> = {
-  draft:     { label: "Draft",      className: "bg-gray-100 text-gray-600" },
-  submitted: { label: "Submitted",  className: "bg-blue-100 text-blue-700" },
-  confirmed: { label: "Confirmed",  className: "bg-green-100 text-green-700" },
-  rejected:  { label: "Rejected",   className: "bg-red-100 text-red-700" },
-  shipped:   { label: "Shipped",    className: "bg-purple-100 text-purple-700" },
-  delivered: { label: "Delivered",  className: "bg-teal-100 text-teal-700" },
-  cancelled: { label: "Cancelled",  className: "bg-gray-100 text-gray-500" },
-};
-
+type AsnFilters = { status: ASNStatus | null };
 
 export default function AdminASNApprovalsPage() {
   const toast = useRef<Toast>(null);
 
-  //Table state
-  const [asns,         setAsns]         = useState<ASN[]>([]);
-  const [loading,      setLoading]      = useState(true);
-  const [page,         setPage]         = useState(1);
-  const [rows,         setRows]         = useState(10);
-  const [totalRecords, setTotalRecords] = useState(0);
-  const [search,       setSearch]       = useState("");
-  const debouncedSearch                 = useDebounce(search, 500);
-
-  //Filter state — server-side
-  const [statusFilter, setStatusFilter] = useState<ASNStatus | null>(null);
-
-  //KPI counts
+  //KPI counts — independent of table filters
   const [counts, setCounts] = useState<StatusCounts>({
     total: 0, pending: 0, approved: 0, rejected: 0,
   });
-  const [countsLoading, setCountsLoading] = useState(true);
+  const [countsLoading, setCountsLoading]   = useState(true);
+  const countsFetchedRef                    = useRef(false);
 
   //Dialog state
-  const [selectedASN,          setSelectedASN]          = useState<ASN | null>(null);
-  const [dialogVisible,        setDialogVisible]        = useState(false);
-  const [rejectDialogVisible,  setRejectDialogVisible]  = useState(false);
-  const [rejectReason,         setRejectReason]         = useState("");
-  const [actionLoading,        setActionLoading]        = useState(false);
+  const [selectedASN,         setSelectedASN]         = useState<ASN | null>(null);
+  const [dialogVisible,       setDialogVisible]       = useState(false);
+  const [rejectDialogVisible, setRejectDialogVisible] = useState(false);
+  const [rejectReason,        setRejectReason]        = useState("");
+  const [actionLoading,       setActionLoading]       = useState(false);
 
-  //Load KPI counts once (independent of table filters)
+  //Stable initial filters
+  const initialFilters = useMemo<AsnFilters>(() => ({ status: null }), []);
+
+  // Paginated table — replaces page/rows/search/statusFilter/loadASNs
+  const {
+    data: asns,
+    totalRecords,
+    loading,
+    rows,
+    onPageChange,
+    setSearch,
+    filters,
+    setFilter,
+    refetch,
+  } = usePaginatedQuery<ASN, AsnFilters>({
+    initialFilters,
+
+    fetchFn: useCallback(
+      ({ page, rows, search, filters }) =>
+        getAllAdminASNs(page, rows, search, filters.status ?? undefined),
+      [],
+    ),
+
+    onError: useCallback((err: any) => {
+      toast.current?.show({
+        severity: "error",
+        summary:  "Error",
+        detail:   err?.response?.data?.message ?? "Failed to load ASNs",
+        life:     3000,
+      });
+    }, []),
+  });
+
+  //KPI counts — fetched once
   const loadCounts = useCallback(async () => {
     try {
       setCountsLoading(true);
@@ -140,44 +81,13 @@ export default function AdminASNApprovalsPage() {
     }
   }, []);
 
-  // Load table data
-  // Re-runs when page, rows, search, or statusFilter changes
-  const loadASNs = useCallback(async () => {
-    try {
-      setLoading(true);
-      const response = await getAllAdminASNs(
-        page,
-        rows,
-        debouncedSearch,
-        statusFilter ?? undefined,
-      );
-      setAsns(response.data);
-      setTotalRecords(response.total);
-    } catch (err: any) {
-      toast.current?.show({
-        severity: "error",
-        summary:  "Error",
-        detail:   err?.response?.data?.message ?? "Failed to load ASNs",
-        life:     3000,
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [page, rows, debouncedSearch, statusFilter]);
-
-  //Reset to page 1 when filter/search changes
   useEffect(() => {
-    setPage(1);
-  }, [debouncedSearch, statusFilter]);
-
-  useEffect(() => {
-    loadASNs();
-  }, [loadASNs]);
-
-  useEffect(() => {
+    if (countsFetchedRef.current) return;
+    countsFetchedRef.current = true;
     loadCounts();
   }, [loadCounts]);
 
+  //Handlers
   const handleView = (asn: ASN) => {
     setSelectedASN(asn);
     setDialogVisible(true);
@@ -198,12 +108,6 @@ export default function AdminASNApprovalsPage() {
       setActionLoading(true);
       await approveASN(asn.id);
 
-      // Update row in place — no full reload needed
-      setAsns((prev) =>
-        prev.map((a) =>
-          a.id === asn.id ? { ...a, status: "confirmed" as ASNStatus } : a,
-        ),
-      );
       setCounts((c) => ({
         ...c,
         pending:  Math.max(0, c.pending - 1),
@@ -217,6 +121,13 @@ export default function AdminASNApprovalsPage() {
         detail:   `${asn.asnNumber} approved successfully.`,
         life:     3000,
       });
+
+      // Refetch isn't exposed from this destructure, but the row
+      // visually goes stale until the next natural refetch (page
+      // change, search, filter). Add `refetch` to the destructure
+      // below if you want it to reflect immediately:
+      //   const { ..., refetch } = usePaginatedQuery(...)
+        refetch();
     } catch (err: any) {
       toast.current?.show({
         severity: "error",
@@ -242,13 +153,6 @@ export default function AdminASNApprovalsPage() {
       setActionLoading(true);
       await rejectASN(selectedASN.id, rejectReason.trim());
 
-      setAsns((prev) =>
-        prev.map((a) =>
-          a.id === selectedASN.id
-            ? { ...a, status: "rejected" as ASNStatus, rejectionReason: rejectReason.trim() }
-            : a,
-        ),
-      );
       setCounts((c) => ({
         ...c,
         pending:  Math.max(0, c.pending - 1),
@@ -263,6 +167,8 @@ export default function AdminASNApprovalsPage() {
         detail:   `${selectedASN.asnNumber} has been rejected.`,
         life:     3000,
       });
+      
+      refetch();
     } catch (err: any) {
       toast.current?.show({
         severity: "error",
@@ -273,11 +179,6 @@ export default function AdminASNApprovalsPage() {
     } finally {
       setActionLoading(false);
     }
-  };
-
-  const handleStatusFilterChange = (value: ASNStatus | null) => {
-    setStatusFilter(value);
-    setPage(1);
   };
 
   const canActOn = (status: ASNStatus) =>
@@ -317,19 +218,19 @@ export default function AdminASNApprovalsPage() {
       <div className="flex items-center gap-3">
         <span className="text-sm text-muted-foreground">Status:</span>
         <Dropdown
-          value={statusFilter}
+          value={filters.status}
           options={STATUS_OPTIONS}
-          onChange={(e) => handleStatusFilterChange(e.value)}
+          onChange={(e) => setFilter("status", e.value)}
           placeholder="All statuses"
           className="w-48"
         />
-        {statusFilter && (
+        {filters.status && (
           <Button
             label="Clear"
             icon="pi pi-times"
             size="small"
             text
-            onClick={() => handleStatusFilterChange(null)}
+            onClick={() => setFilter("status", null)}
           />
         )}
       </div>
@@ -340,22 +241,17 @@ export default function AdminASNApprovalsPage() {
         loading={loading}
         onView={handleView}
         totalRecords={totalRecords}
-        // page={page}
         rows={rows}
-        onPageChange={(e:any) => {
-          setPage(e.page + 1);
-          setRows(e.rows);
-        }}
-        // search={search}
+        onPageChange={onPageChange}
         onSearchChange={setSearch}
         columns={[
-          { field: "asnNumber",          header: "ASN Number",    sortable: true, filter: true },
-          { field: "poNo",               header: "PO Number",     sortable: true, filter: true },
-          { field: "vendorId",           header: "Vendor ID",     sortable: true, filter: true },
-          { field: "estimatedShipDate",  header: "Ship Date",     sortable: true },
-          { field: "carrierName",        header: "Carrier",       sortable: true },
-          { field: "trackingNumber",     header: "Tracking #",    sortable: true },
-          { field: "submittedAt",        header: "Submitted At",  sortable: true },
+          { field: "asnNumber",         header: "ASN Number",   sortable: true, filter: true },
+          { field: "poNo",              header: "PO Number",    sortable: true, filter: true },
+          { field: "vendorId",          header: "Vendor ID",    sortable: true, filter: true },
+          { field: "estimatedShipDate", header: "Ship Date",    sortable: true },
+          { field: "carrierName",       header: "Carrier",      sortable: true },
+          { field: "trackingNumber",    header: "Tracking #",   sortable: true },
+          { field: "submittedAt",       header: "Submitted At", sortable: true },
           {
             field:  "status",
             header: "Status",
@@ -383,17 +279,15 @@ export default function AdminASNApprovalsPage() {
       >
         {selectedASN && (
           <div className="space-y-5 pt-2">
-
-            {/* HEADER INFO */}
             <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-3 text-sm">
               {[
-                { label: "ASN Number",          value: selectedASN.asnNumber },
-                { label: "PO Number",           value: selectedASN.poNo },
-                { label: "Vendor ID",           value: selectedASN.vendorId },
-                { label: "Carrier",             value: selectedASN.carrierName },
-                { label: "Tracking #",          value: selectedASN.trackingNumber },
-                { label: "Shipment Mode",       value: selectedASN.shipmentMode ?? "—" },
-                { label: "Sold To",             value: selectedASN.soldTo ?? "—" },
+                { label: "ASN Number",    value: selectedASN.asnNumber },
+                { label: "PO Number",     value: selectedASN.poNo },
+                { label: "Vendor ID",     value: selectedASN.vendorId },
+                { label: "Carrier",       value: selectedASN.carrierName },
+                { label: "Tracking #",    value: selectedASN.trackingNumber },
+                { label: "Shipment Mode", value: selectedASN.shipmentMode ?? "—" },
+                { label: "Sold To",       value: selectedASN.soldTo ?? "—" },
                 {
                   label: "Estimated Ship Date",
                   value: selectedASN.estimatedShipDate
@@ -438,7 +332,6 @@ export default function AdminASNApprovalsPage() {
               )}
             </div>
 
-            {/* LINE ITEMS */}
             <div>
               <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
                 Line Items
@@ -449,24 +342,23 @@ export default function AdminASNApprovalsPage() {
                 globalSearch={false}
                 rows={5}
                 columns={[
-                  { field: "poItem",          header: "PO Item" },
-                  { field: "matCode",         header: "Material Code" },
-                  { field: "matDesc",         header: "Description" },
-                  { field: "ndcCode",         header: "NDC" },
+                  { field: "poItem",           header: "PO Item" },
+                  { field: "matCode",          header: "Material Code" },
+                  { field: "matDesc",          header: "Description" },
+                  { field: "ndcCode",          header: "NDC" },
                   { field: "originalQty",      header: "Ordered Qty" },
-                  { field: "submittedQty",  header: "Deliverable Qty" },
-                  { field: "uom",             header: "UOM" },
-                  { field: "batchNo",         header: "Batch No" },
-                  { field: "numberOfPackages",header: "Packages" },
-                  { field: "packageType",     header: "Type" },
-                  { field: "grossWeight",     header: "Gross Weight" },
-                  { field: "weightUnit",      header: "Unit" },
-                  { field: "upsWarehouseId",  header: "Warehouse" },
+                  { field: "submittedQty",     header: "Deliverable Qty" },
+                  { field: "uom",              header: "UOM" },
+                  { field: "batchNo",          header: "Batch No" },
+                  { field: "numberOfPackages", header: "Packages" },
+                  { field: "packageType",      header: "Type" },
+                  { field: "grossWeight",      header: "Gross Weight" },
+                  { field: "weightUnit",       header: "Unit" },
+                  { field: "upsWarehouseId",   header: "Warehouse" },
                 ]}
               />
             </div>
 
-            {/* ACTIONS */}
             <div className="flex justify-end gap-2 pt-2 border-t border-border">
               <Button
                 label="Close"

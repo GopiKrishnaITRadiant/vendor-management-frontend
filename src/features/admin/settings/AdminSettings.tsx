@@ -3,12 +3,11 @@ import { useState } from "react";
 import { InputSwitch } from "primereact/inputswitch";
 import { Toast } from "primereact/toast";
 import { useRef } from "react";
-import { useAuth } from "../../context/AuthContext";
-import { updateTwoFactor } from "../../services/usersService";
+import { useAuth } from "../../../context/AuthContext";
+import { updateTwoFactor } from "../../../services/UsersService";
 
 export default function AdminSettings() {
   const { user } = useAuth();
-  console.log('user', user);
   const navigate = useNavigate();
   const toast = useRef<Toast>(null);
 

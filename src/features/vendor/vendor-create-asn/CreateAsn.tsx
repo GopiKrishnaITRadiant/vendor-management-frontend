@@ -1,4 +1,3 @@
-// src/pages/asn/CreateASNPage.tsx
 import { useState, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -9,21 +8,14 @@ import { Dropdown }    from "primereact/dropdown";
 import { Calendar }    from "primereact/calendar";
 import { Divider }     from "primereact/divider";
 import { Toast }       from "primereact/toast";
-
-import AppTable        from "../../components/table/DataTable";
-import type { PurchaseOrder } from "../../types/purchaseOrderTypes";
-import type { WarehouseType } from "../../types/asnTypes";
-import { createASN }   from "../../services/ASNService";
-import { useAuth }     from "../../context/AuthContext";
-
-// ─── Local form types ─────────────────────────────────────────────────────────
+import type { PurchaseOrder } from "../../../types/purchaseOrderTypes";
+import type { WarehouseType } from "../../../types/asnTypes";
+import { createASN } from "../../../services/ASNService";
+import { carrierOptions, packageTypeOptions, shipmentModeOptions, uomOptions, warehouseTypeOptions, weightUnitOptions } from "./create-asn.constants";
+import AppTable from "../../../components/table/DataTable";
 
 type LocationState = { selectedOrders: PurchaseOrder[] };
 
-/**
- * One editable row in Step 2.
- * Fields map 1-to-1 to CreateAsnItemDto (backend DTO).
- */
 type ASNLineForm = {
   // read-only identity (from PO)
   id:             number | string;
@@ -43,49 +35,6 @@ type ASNLineForm = {
   grossWeight:    number | null;
   weightUnit:     string;
 };
-
-// ─── Dropdown option lists ────────────────────────────────────────────────────
-
-const warehouseTypeOptions = [
-  { label: "SD60 – Non-Controlled", value: "SD60" },
-  { label: "SD61 – Controlled",     value: "SD61" },
-];
-
-const packageTypeOptions = [
-  { label: "Box",    value: "Box"    },
-  { label: "Carton", value: "Carton" },
-  { label: "Pallet", value: "Pallet" },
-  { label: "Drum",   value: "Drum"   },
-  { label: "Bag",    value: "Bag"    },
-];
-
-const weightUnitOptions = [
-  { label: "KG",  value: "KG"  },
-  { label: "LBS", value: "LBS" },
-];
-
-const uomOptions = [
-  { label: "EA (Each)",   value: "EA" },
-  { label: "BX (Box)",    value: "BX" },
-  { label: "CT (Carton)", value: "CT" },
-];
-
-// shipmentMode values must match backend enum exactly
-const shipmentModeOptions = [
-  { label: "Air",  value: "AIR"  },
-  { label: "Road", value: "ROAD" },
-  { label: "Rail", value: "RAIL" },
-  { label: "Sea",  value: "SEA"  },
-];
-
-const carrierOptions = [
-  { label: "FedEx",     value: "FedEx"     },
-  { label: "UPS",       value: "UPS"       },
-  { label: "DHL",       value: "DHL"       },
-  { label: "Blue Dart", value: "Blue Dart" },
-];
-
-// ─── Helper components ────────────────────────────────────────────────────────
 
 function StepIndicator({ current }: { current: 1 | 2 }) {
   const steps = [
@@ -156,8 +105,6 @@ export default function CreateASNPage() {
   const [step,   setStep]   = useState<1 | 2>(1);
   const [saving, setSaving] = useState(false);
 
-  //Step 1 state
-  // warehouseType is the one required field on the ASN header (drives SD60/SD61)
   const [warehouseType,          setWarehouseType]          = useState<WarehouseType>("SD60");
   const [estimatedShipDate,      setEstimatedShipDate]      = useState<Date | null>(null);
   const [estimatedDeliveryDate,  setEstimatedDeliveryDate]  = useState<Date | null>(null);
@@ -177,7 +124,7 @@ export default function CreateASNPage() {
 
       deliverableQty:  po.actQty ?? 1,
       uom:             po.uom  ?? "EA",
-      upsWarehouseId:  "",          // vendor fills per line if needed
+      upsWarehouseId:  "",
       batchNo:         "",
       manufactureDate: null,
       expiryDate:      null,
@@ -306,7 +253,6 @@ export default function CreateASNPage() {
         <StepIndicator current={step} />
       </div>
 
-      {/* ════════════════════════════════════════ STEP 1 ══════════════════════════════════════════ */}
       {step === 1 && (
         <div className="space-y-5">
           <div className="card p-6 space-y-6">
@@ -452,7 +398,6 @@ export default function CreateASNPage() {
         </div>
       )}
 
-      {/* ════════════════════════════════════════ STEP 2 ══════════════════════════════════════════ */}
       {step === 2 && (
         <div className="space-y-5">
 

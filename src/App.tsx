@@ -10,21 +10,21 @@ import LoginPage from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import ErrorBoundary from "./components/ErrorBoundary";
 
-import PurchaseOrdersPage from "./pages/vendor/PurchaseOrder";
-import CreateASNPage from "./pages/vendor/CreateAsn";
-import ASNHistoryPage from "./pages/vendor/AsnHistory";
-import VendorDashboardPage from "./pages/vendor/VendorDashboard";
+import PurchaseOrdersPage from "./features/vendor/vendor-purchase-orders/PurchaseOrder";
+import CreateASNPage from "./features/vendor/vendor-create-asn/CreateAsn";
+import ASNHistoryPage from "./features/vendor/vendor-asn-history/AsnHistory";
+import VendorDashboardPage from "./features/vendor/vendor-dashboard/VendorDashboard";
 
-import AdminDashboardPage from "./pages/Admin/AdminDashboard";
-import AdminASNApprovalsPage from "./pages/Admin/AsnApprove";
-import AdminPurchaseOrdersPage from "./pages/Admin/AdminPurchaseOrders";
-import AdminVendorManagementPage from "./pages/Admin/AdminVendorManagement";
-import AdminUsersRolesPage from "./pages/Admin/AdminUserRoles";
+import AdminDashboardPage from "./features/admin/dashboard/AdminDashboard";
+import AdminASNApprovalsPage from "./features/admin/asn/AsnApprove";
+import AdminPurchaseOrdersPage from "./features/admin/admin-purchase-orders/AdminPurchaseOrders";
+import AdminVendorManagementPage from "./features/admin/vendors/AdminVendorManagement";
+import AdminUsersRolesPage from "./features/admin/users/AdminUserRoles";
 
 import ProtectedRoute from "./routes/ProtectedRoutes";
-import AdminProfile from "./pages/Admin/AdminProfile";
-import AdminSettings from "./pages/Admin/AdminSettings";
-import SAPSyncLogsPage from "./pages/Admin/SAPSyncLogsPage";
+import AdminProfile from "./features/admin/profile/AdminProfile";
+import AdminSettings from "./features/admin/settings/AdminSettings";
+import SAPSyncLogsPage from "./features/admin/sap-sync/SAPSyncLogsPage";
 
 //Root redirect — waits for the silent /auth/refresh bootstrap
 function RootRedirect() {

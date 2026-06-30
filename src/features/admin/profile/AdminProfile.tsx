@@ -2,11 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { Avatar } from "primereact/avatar";
 import { Button } from "primereact/button";
 import { Tag } from "primereact/tag";
-import { useAuth } from "../../context/AuthContext";
-
-// ─── Component ───────────────────────────────────────────
-// Route: /admin/profile
-// Read-only view of the signed-in admin's account details.
+import { useAuth } from "../../../context/AuthContext";
 
 export default function AdminProfile() {
   const { user } = useAuth();

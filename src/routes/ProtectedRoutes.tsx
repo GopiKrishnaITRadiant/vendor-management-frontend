@@ -11,7 +11,11 @@ export default function ProtectedRoute({ allowedRoles }: { allowedRoles: string[
       </div>
     );
   }
-
+  console.log("ProtectedRoute", {
+  isLoading,
+  isAuthenticated,
+  role: user?.role?.name,
+});
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
   const roleName = user?.role?.name;

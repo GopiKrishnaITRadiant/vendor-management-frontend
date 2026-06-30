@@ -1,27 +1,18 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "primereact/button";
-
-import AppTable from "../../components/table/DataTable";
-import { ASNDetailDialog, StatusBadge } from "../../components/dialogs/AsnDetailDialog";
-
-import { getAllASNs, submitASN } from "../../services/ASNService";
-import { useAuth } from "../../context/AuthContext";
-import { useDebounce } from "../../hooks/debounceHook";
-
-import type { ASN, ASNStatus } from "../../types/asnTypes";
-
-type TabStatus = ASNStatus | "All";
-
-const STATUS_TABS: Array<{
-  label: string;
-  value: TabStatus;
-}> = [
-  { label: "All", value: "All" },
-  { label: "Pending", value: "submitted" },
-  { label: "Approved", value: "confirmed" },
-  { label: "Rejected", value: "rejected" },
-];
+import type { ASN } from "../../../types/asnTypes";
+import { useAuth } from "../../../context/AuthContext";
+import { useDebounce } from "../../../hooks/debounceHook";
+import { getAllASNs, submitASN } from "../../../services/ASNService";
+import AppTable from "../../../components/table/DataTable";
+import {
+  ASNDetailDialog,
+  StatusBadge,
+} from "../../../components/dialogs/AsnDetailDialog";
+import { STATUS_TABS, type TabStatus } from "./asn.constants";
+import { formatDateTime } from "../../../utils/formatDateTime";
+import { formatDate } from "../../../utils/formatDateUtil";
 
 export default function ASNHistoryPage() {
   const navigate = useNavigate();
@@ -55,9 +46,9 @@ export default function ASNHistoryPage() {
       const response = await getAllASNs(
         page,
         rows,
-        String(user?.sapVendorId||'1'),
+        String(user?.sapVendorId || "1"),
         debouncedSearch,
-        activeTab === "All" ? undefined : activeTab
+        activeTab === "All" ? undefined : activeTab,
       );
 
       setAsnHistory(response.data ?? []);
@@ -67,13 +58,7 @@ export default function ASNHistoryPage() {
     } finally {
       setLoading(false);
     }
-  }, [
-    user?.id,
-    page,
-    rows,
-    debouncedSearch,
-    activeTab,
-  ]);
+  }, [user?.id, page, rows, debouncedSearch, activeTab]);
 
   useEffect(() => {
     loadAsns();
@@ -82,17 +67,13 @@ export default function ASNHistoryPage() {
   const counts = useMemo(
     () => ({
       All: totalRecords,
-      submitted: asnHistory.filter(
-        (item) => item.status === "submitted"
-      ).length,
-      confirmed: asnHistory.filter(
-        (item) => item.status === "confirmed"
-      ).length,
-      rejected: asnHistory.filter(
-        (item) => item.status === "rejected"
-      ).length,
+      submitted: asnHistory.filter((item) => item.status === "submitted")
+        .length,
+      confirmed: asnHistory.filter((item) => item.status === "confirmed")
+        .length,
+      rejected: asnHistory.filter((item) => item.status === "rejected").length,
     }),
-    [asnHistory, totalRecords]
+    [asnHistory, totalRecords],
   );
 
   const kpiCards = useMemo(
@@ -130,37 +111,23 @@ export default function ASNHistoryPage() {
         icon: "pi pi-times-circle",
       },
     ],
-    [counts]
+    [counts],
   );
-
-  
 
   const handleView = (asn: ASN) => {
     setSelectedASN(asn);
     setDialogVisible(true);
   };
 
-  const formatDate = (value?: string | Date) => {
-    if (!value) return "-";
-
-    return new Date(value).toLocaleDateString();
-  };
-
   const handleSubmitDraft = async (asnId: number) => {
-  try {
-    await submitASN(asnId);
-    await loadAsns();
+    try {
+      await submitASN(asnId);
+      await loadAsns();
 
-    setDialogVisible(false);
-  } catch (error: any) {
-    console.log(error);
-  }
-};
-
-  const formatDateTime = (value?: string | Date) => {
-    if (!value) return "-";
-
-    return new Date(value).toLocaleString();
+      setDialogVisible(false);
+    } catch (error: any) {
+      console.log(error);
+    }
   };
 
   return (
@@ -168,9 +135,7 @@ export default function ASNHistoryPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">
-            ASN History
-          </h1>
+          <h1 className="text-2xl font-bold">ASN History</h1>
 
           <p className="text-sm text-muted-foreground mt-1">
             Track all submitted advance shipment notices
@@ -190,21 +155,15 @@ export default function ASNHistoryPage() {
           <div
             key={card.label}
             className={`card p-5 cursor-pointer transition-all hover:shadow-md ${
-              activeTab === card.status
-                ? "ring-2 ring-primary"
-                : ""
+              activeTab === card.status ? "ring-2 ring-primary" : ""
             }`}
             onClick={() => setActiveTab(card.status)}
           >
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-sm text-muted-foreground">
-                  {card.label}
-                </p>
+                <p className="text-sm text-muted-foreground">{card.label}</p>
 
-                <h3
-                  className={`text-2xl font-bold mt-1 ${card.color}`}
-                >
+                <h3 className={`text-2xl font-bold mt-1 ${card.color}`}>
                   {card.value}
                 </h3>
               </div>
@@ -237,9 +196,7 @@ export default function ASNHistoryPage() {
 
               <span
                 className={`text-xs px-2 py-0.5 rounded-full ${
-                  activeTab === tab.value
-                    ? "bg-primary text-white"
-                    : "bg-muted"
+                  activeTab === tab.value ? "bg-primary text-white" : "bg-muted"
                 }`}
               >
                 {counts[tab.value as keyof typeof counts]}
@@ -287,8 +244,7 @@ export default function ASNHistoryPage() {
               field: "estimatedShipDate",
               header: "Ship Date",
               sortable: true,
-              body: (row: ASN) =>
-                formatDate(row.estimatedShipDate as string),
+              body: (row: ASN) => formatDate(row.estimatedShipDate as string),
             },
             {
               field: "soldTo",
@@ -304,16 +260,13 @@ export default function ASNHistoryPage() {
               field: "submittedAt",
               header: "Submitted",
               sortable: true,
-              body: (row: ASN) =>
-                formatDateTime(row.submittedAt as string),
+              body: (row: ASN) => formatDateTime(row.submittedAt as string),
             },
             {
               field: "status",
               header: "Status",
               sortable: true,
-              body: (row: ASN) => (
-                <StatusBadge status={row.status} />
-              ),
+              body: (row: ASN) => <StatusBadge status={row.status} />,
             },
           ]}
         />

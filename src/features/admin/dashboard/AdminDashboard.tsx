@@ -1,79 +1,14 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "primereact/button";
-import { BarChart } from "../../components/vendor/dashboard/BarChart";
-import { getAdminDashboard } from "../../services/DashboardService";
-import { useAuth } from "../../context/AuthContext";
-
-export interface DashboardStats {
-  totalPOs: number;
-  totalPOsThisWeek: number;
-  pendingASNs: number;
-  activeVendors: number;
-  suspendedVendors: number;
-  completedOrders: number;
-  completedThisMonth: number;
-}
-
-export interface POSummary {
-  totalPOLines: number;
-  open: number;
-  inProgress: number;
-  completed: number;
-}
-
-export interface MonthlyActivity {
-  month: string;
-  submitted: number;
-  approved: number;
-  rejected: number;
-}
-
-export type ActivityType =
-  | "CREATED"
-  | "SUBMITTED"
-  | "APPROVED"
-  | "REJECTED"
-  | "UPDATED";
-
-export interface RecentActivity {
-  asnId: number;
-  asnNumber: string;
-  poNo: string;
-  status: string;
-  activityType: ActivityType;
-  activityDate: string;
-}
-
-export interface TopVendor {
-  rank: number;
-  vendorId: number;
-  vendorNo: string | null;
-  vendorName: string;
-  totalOrders: number;
-  totalASNs: number;
-  deliveredASNs: number;
-  onTimeRate: number;
-}
-
-export interface AdminDashboardResponse {
-  stats: DashboardStats;
-  poSummary: POSummary;
-  monthlyActivity: MonthlyActivity[];
-  recentActivity: RecentActivity[];
-  topVendors: TopVendor[];
-}
-
-const activityIcon: Record<ActivityType, { icon: string; color: string }> = {
-  CREATED: { icon: "pi pi-plus-circle", color: "text-primary" },
-  SUBMITTED: { icon: "pi pi-send", color: "text-warning" },
-  APPROVED: { icon: "pi pi-check-circle", color: "text-success" },
-  REJECTED: { icon: "pi pi-times-circle", color: "text-danger" },
-  UPDATED: { icon: "pi pi-pencil", color: "text-info" },
-};
+import { BarChart } from "../../../components/vendor/dashboard/BarChart";
+import { getAdminDashboard } from "../../../services/DashboardService";
+import { useAuth } from "../../../context/AuthContext";
+import type { AdminDashboardResponse } from "./types";
+import { activityIcon, DASHBOARD_CARDS } from "./constants";
 
 export default function AdminDashboardPage() {
-  const {isLoading,isAuthenticated}=useAuth()
+  const { isLoading, isAuthenticated } = useAuth();
   const [dashboard, setDashboard] = useState<AdminDashboardResponse | null>(
     null,
   );
@@ -129,49 +64,19 @@ export default function AdminDashboardPage() {
 
       {/* KPI CARDS */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        {[
-          {
-            label: "Total POs",
-            value: dashboard?.stats?.totalPOs ?? "—",
-            sub: `${dashboard?.stats?.totalPOsThisWeek ?? 0} this week`,
-            icon: "pi pi-file",
-            accent: "text-blue-600",
-            bg: "bg-blue-50",
-          },
-          {
-            label: "Pending ASNs",
-            value: dashboard?.stats?.pendingASNs ?? "—",
-            sub: "Awaiting approval",
-            icon: "pi pi-clock",
-            accent: "text-amber-600",
-            bg: "bg-amber-50",
-          },
-          {
-            label: "Active Vendors",
-            value: dashboard?.stats?.activeVendors ?? "—",
-            sub: `${dashboard?.stats?.suspendedVendors ?? 0} suspended`,
-            icon: "pi pi-building",
-            accent: "text-green-600",
-            bg: "bg-green-50",
-          },
-          {
-            label: "Completed Orders",
-            value: dashboard?.stats?.completedOrders ?? "—",
-            sub: `This month ${dashboard?.stats?.completedThisMonth ?? 0}`,
-            icon: "pi pi-check-circle",
-            accent: "text-purple-600",
-            bg: "bg-purple-50",
-          },
-        ].map((card) => (
-          <div key={card.label} className="card p-5">
+        {DASHBOARD_CARDS.map((card) => (
+          <div key={card.valueKey} className="card p-5">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">{card.label}</p>
-                <h3 className="text-3xl font-bold text-foreground mt-1">
-                  {card.value}
+                <h3 className="text-3xl font-bold mt-1">
+                  {dashboard?.stats?.[card.valueKey] ?? "—"}
                 </h3>
-                <p className="text-xs text-muted-foreground mt-1">{card.sub}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {card.sub(dashboard?.stats)}
+                </p>
               </div>
+
               <div
                 className={`w-10 h-10 rounded-lg ${card.bg} flex items-center justify-center`}
               >

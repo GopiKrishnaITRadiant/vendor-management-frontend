@@ -45,5 +45,7 @@ export interface POGroup {
   lineCount: number;
   totalQty:  number;
   updatedAt: string;
+  deliveredQty: number;
+  fulfillmentStatus: string;
   lineItems: PurchaseOrder[];
 }

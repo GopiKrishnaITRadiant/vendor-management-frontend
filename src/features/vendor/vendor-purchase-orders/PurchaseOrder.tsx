@@ -5,19 +5,11 @@ import { Toast } from "primereact/toast";
 import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
 import { InputText } from "primereact/inputtext";
-import { getPurchaseOrders, getVendorPurchaseOrderSummary } from "../../services/PurchaseOrderService";
-import { useAuth } from "../../context/AuthContext";
-import type { POGroup, PurchaseOrder, Stats, StatusTab } from "../../types/purchaseOrderTypes";
-import { useDebounce } from "../../hooks/debounceHook";
-
-
-const STATUS_STYLE: Record<string, string> = {
-  active:        "bg-blue-50 text-blue-700",
-  deleted:       "bg-red-50 text-red-700",
-  "ASN Created": "bg-amber-50 text-amber-700",
-  "In Progress": "bg-purple-50 text-purple-700",
-  Completed:     "bg-green-50 text-green-700",
-};
+import { useAuth } from "../../../context/AuthContext";
+import type { POGroup, PurchaseOrder, Stats } from "../../../types/purchaseOrderTypes";
+import { useDebounce } from "../../../hooks/debounceHook";
+import { STATUS_STYLE } from "./vendor-purchase-orders.constants";
+import { getPurchaseOrders, getVendorPurchaseOrderSummary } from "../../../services/PurchaseOrderService";
 
 function StatusBadge({ status }: { status: string }) {
   return (
@@ -239,6 +231,7 @@ export default function PurchaseOrdersPage() {
           onRowToggle={(e) => setExpandedRows(e.data as Record<string, boolean>)}
           rowExpansionTemplate={rowExpansionTemplate}
           lazy
+          showGridlines
           paginator
           rows={rows}
           totalRecords={totalRecords}
@@ -259,8 +252,9 @@ export default function PurchaseOrdersPage() {
             header="Last Updated"
             body={updatedAtBody}
           />
-          <Column field="totalQty" header="Total Qty"  />
-
+          <Column field="totalQty" header="Total Qty"/>
+          <Column field="deliveredQty" header="Delivered"/>
+          <Column field="fulfillmentStatus"   header="Status"/>
         </DataTable>
       </div>
     </div>

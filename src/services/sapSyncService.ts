@@ -6,6 +6,8 @@ type SyncLogsParams = {
   range?:    "today" | "week" | "month" | "quarter" | "year" | "custom";
   fromDate?: string;   // YYYY-MM-DD
   toDate?:   string;   // YYYY-MM-DD
+  status?:   string;   // ← add
+  search?:   string;   // ← add
 };
 
 export async function getSyncStatus(params: SyncLogsParams = {}) {
@@ -31,6 +33,14 @@ export async function getSyncStatus(params: SyncLogsParams = {}) {
     searchParams.set("toDate", params.toDate);
   }
 
+  if (params.status) {
+    searchParams.set("status", params.status);
+  }
+
+  if (params.search) {
+    searchParams.set("search", params.search);
+  }
+
   const url = `/sap-sync/logs?${searchParams.toString()}`;
 
   const response = await apiFetch(url);
@@ -42,7 +52,6 @@ export async function getSyncStatus(params: SyncLogsParams = {}) {
 
   return data.data;
 }
-
 export const getSyncFailedRows = async () => {
   const res = await apiFetch("/sap-sync/logs/failed-rows");
   const data = await res.json().catch(() => ({}));

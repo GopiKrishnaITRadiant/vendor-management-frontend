@@ -1,35 +1,11 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "primereact/button";
-import { BarChart } from "../../components/vendor/dashboard/BarChart";
-import type {
-  ActivityPeriod,
-  RecentAsn,
-  RecentAsnStatus,
-  VendorDashboardResponse,
-} from "../../types/vendorDashboardTypes";
-import { getVendorDashboard } from "../../services/DashboardService";
-import { useAuth } from "../../context/AuthContext";
-
-const ASN_STATUS_STYLE: Record<RecentAsnStatus, string> = {
-  draft:     "bg-gray-50 text-gray-700",
-  submitted: "bg-amber-50 text-amber-700",
-  confirmed: "bg-blue-50 text-blue-700",
-  approved:  "bg-green-50 text-green-700",
-  rejected:  "bg-red-50 text-red-700",
-  shipped:   "bg-indigo-50 text-indigo-700",
-  delivered: "bg-teal-50 text-teal-700",
-};
-
-const ASN_STATUS_ICON: Record<RecentAsnStatus, string> = {
-  draft:     "pi pi-file",
-  submitted: "pi pi-clock",
-  confirmed: "pi pi-search",
-  approved:  "pi pi-check-circle",
-  rejected:  "pi pi-times-circle",
-  shipped:   "pi pi-truck",
-  delivered: "pi pi-box",
-};
+import { useAuth } from "../../../context/AuthContext";
+import type { ActivityPeriod, RecentAsn, VendorDashboardResponse } from "../../../types/vendorDashboardTypes";
+import { BarChart } from "../../../components/vendor/dashboard/BarChart";
+import { ASN_STATUS_ICON, ASN_STATUS_STYLE } from "./vendor-dashborad.constants";
+import { getVendorDashboard } from "../../../services/DashboardService";
 
 
 function StatusBadge({ label, className }: { label: string; className: string }) {
