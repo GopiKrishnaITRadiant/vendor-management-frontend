@@ -25,6 +25,8 @@ import ProtectedRoute from "./routes/ProtectedRoutes";
 import AdminProfile from "./features/admin/profile/AdminProfile";
 import AdminSettings from "./features/admin/settings/AdminSettings";
 import SAPSyncLogsPage from "./features/admin/sap-sync/SAPSyncLogsPage";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 
 //Root redirect — waits for the silent /auth/refresh bootstrap
 function RootRedirect() {
@@ -51,6 +53,8 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password"  element={<ResetPassword />} />
       <Route path= "/not-found" element={<NotFound />} />
       <Route path="/" element={<RootRedirect />} />
 

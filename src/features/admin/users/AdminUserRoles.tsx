@@ -2,8 +2,6 @@ import { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { Button } from "primereact/button";
 import { Dialog } from "primereact/dialog";
 import { Dropdown } from "primereact/dropdown";
-import { InputText } from "primereact/inputtext";
-import { Password } from "primereact/password";
 import { Toast } from "primereact/toast";
 import { ConfirmDialog } from "primereact/confirmdialog";
 import AppTable from "../../../components/table/DataTable";
@@ -22,46 +20,52 @@ import {
   USER_DASHBOARD_CARDS,
 } from "./constants";
 import type { UserStatus } from "../../../types/sharedTypes";
+import UserFormDialog from "../../../components/dialogs/userFromDialog";
 
 const emptyUserForm: EditableUserFields = {
   firstName: "",
-  lastName:  "",
-  email:     "",
-  roleId:    null,
-  status:    "pending_verification",
+  lastName: "",
+  email: "",
+  roleId: null,
+  status: "pending_verification",
 };
 
-// ── Filter shape — role + status, matching the original page ──
 type UserFilters = {
-  role:   string | null;
+  role: string | null;
   status: UserStatus | null;
 };
 
 export default function AdminUsersRolesPage() {
   const toast = useRef<Toast>(null);
 
-  // ── Roles list (for dropdowns + filter) ─────────────────
+  //Roles list (for dropdowns + filter)
   const [roles, setRoles] = useState<Role[]>([]);
   const rolesFetchedOnce = useRef(false);
 
-  // ── KPI counts — independent of table filters ───────────
+  //KPI counts — independent of table filters
   const [counts, setCounts] = useState({
-    total: 0, admins: 0, vendors: 0, inactive: 0,
+    total: 0,
+    admins: 0,
+    vendors: 0,
+    inactive: 0,
   });
   const [countsLoading, setCountsLoading] = useState(true);
   const countsFetchedOnce = useRef(false);
 
-  // ── Dialog state ──────────────────────────────────────────
+  //Dialog state
   const [viewDialogVisible, setViewDialogVisible] = useState(false);
   const [formDialogVisible, setFormDialogVisible] = useState(false);
-  const [selectedUser,      setSelectedUser]      = useState<AppUser | null>(null);
-  const [editingUser,       setEditingUser]       = useState<EditableUserFields>(emptyUserForm);
-  const [isEditing,         setIsEditing]         = useState(false);
-  const [actionLoading,     setActionLoading]     = useState(false);
+  const [selectedUser, setSelectedUser] = useState<AppUser | null>(null);
+  const [editingUser, setEditingUser] =
+    useState<EditableUserFields>(emptyUserForm);
+  const [isEditing, setIsEditing] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
 
-  // Stable initial filters
-  // Kept "1" as default role filter to match your original behaviour
-  const initialFilters = useMemo<UserFilters>(() => ({ role: "1", status: null }), []);
+  //Stable initial filters
+  const initialFilters = useMemo<UserFilters>(
+    () => ({ role: "1", status: null }),
+    [],
+  );
 
   //Paginated table
   const {
@@ -81,16 +85,22 @@ export default function AdminUsersRolesPage() {
 
     fetchFn: useCallback(
       ({ page, rows, search, filters }) =>
-        getAllUsers(page, rows, search, filters.role ?? undefined, filters.status ?? undefined),
+        getAllUsers(
+          page,
+          rows,
+          search,
+          filters.role ?? undefined,
+          filters.status ?? undefined,
+        ),
       [],
     ),
 
     onError: useCallback((error: any) => {
       toast.current?.show({
         severity: "error",
-        summary:  "Error",
-        detail:   error?.response?.data?.message ?? "Failed to load users",
-        life:     3000,
+        summary: "Error",
+        detail: error?.response?.data?.message ?? "Failed to load users",
+        life: 3000,
       });
     }, []),
   });
@@ -117,9 +127,9 @@ export default function AdminUsersRolesPage() {
       setCountsLoading(true);
       const data = await getUserCounts();
       setCounts({
-        total:    data.total,
-        admins:   data.admins   ?? 0,
-        vendors:  data.vendors  ?? 0,
+        total: data.total,
+        admins: data.admins ?? 0,
+        vendors: data.vendors ?? 0,
         inactive: data.inactive ?? 0,
       });
     } catch (error) {
@@ -144,10 +154,10 @@ export default function AdminUsersRolesPage() {
     setSelectedUser(u);
     setEditingUser({
       firstName: u.firstName,
-      lastName:  u.lastName,
-      email:     u.email,
-      roleId:    u.role?.id ?? null,
-      status:    u.status,
+      lastName: u.lastName,
+      email: u.email,
+      roleId: u.role?.id ?? null,
+      status: u.status,
     });
     setIsEditing(true);
     setFormDialogVisible(true);
@@ -161,78 +171,101 @@ export default function AdminUsersRolesPage() {
   };
 
   const handleSave = async () => {
-    if (!editingUser.firstName.trim() || !editingUser.lastName.trim() || !editingUser.email.trim()) {
+    if (
+      !editingUser.firstName.trim() ||
+      !editingUser.lastName.trim() ||
+      !editingUser.email.trim()
+    ) {
       toast.current?.show({
         severity: "error",
-        summary:  "Validation",
-        detail:   "First name, last name and email are required.",
-        life:     3000,
+        summary: "Validation",
+        detail: "First name, last name and email are required.",
+        life: 3000,
       });
       return;
     }
     if (!editingUser.roleId) {
       toast.current?.show({
         severity: "error",
-        summary:  "Validation",
-        detail:   "Please select a role.",
-        life:     3000,
+        summary: "Validation",
+        detail: "Please select a role.",
+        life: 3000,
       });
       return;
     }
     if (!isEditing && !editingUser.password?.trim()) {
       toast.current?.show({
         severity: "error",
-        summary:  "Validation",
-        detail:   "Password is required for new users.",
-        life:     3000,
+        summary: "Validation",
+        detail: "Password is required for new users.",
+        life: 3000,
       });
       return;
     }
 
     try {
       setActionLoading(true);
+      if (isEditing && selectedUser) {
+        const hasChanges =
+          editingUser.firstName !== selectedUser.firstName ||
+          editingUser.lastName !== selectedUser.lastName ||
+          editingUser.email !== selectedUser.email ||
+          editingUser.roleId !== (selectedUser.role?.id ?? null) ||
+          editingUser.status !== selectedUser.status;
+
+        if (!hasChanges) {
+          toast.current?.show({
+            severity: "warn",
+            summary: "No Changes",
+            detail: "No changes were made to update.",
+            life: 3000,
+          });
+          return;
+        }
+      }
 
       if (isEditing && selectedUser) {
         await updateUser(selectedUser.id, {
           firstName: editingUser.firstName,
-          lastName:  editingUser.lastName,
-          email:     editingUser.email,
-          status:    editingUser.status,
+          lastName: editingUser.lastName,
+          email: editingUser.email,
+          status: editingUser.status,
+          roleId: editingUser.roleId,
         });
 
         toast.current?.show({
           severity: "success",
-          summary:  "Updated",
-          detail:   `${editingUser.firstName} ${editingUser.lastName} updated.`,
-          life:     3000,
+          summary: "Updated",
+          detail: `${editingUser.firstName} ${editingUser.lastName} updated.`,
+          life: 3000,
         });
       } else {
         await createUser({
           firstName: editingUser.firstName,
-          lastName:  editingUser.lastName,
-          email:     editingUser.email,
-          password:  editingUser.password,
-          roleId:    editingUser.roleId,
+          lastName: editingUser.lastName,
+          email: editingUser.email,
+          password: editingUser.password,
+          roleId: editingUser.roleId,
         });
 
         setCounts((c) => ({ ...c, total: c.total + 1 }));
 
         toast.current?.show({
           severity: "success",
-          summary:  "Created",
-          detail:   `${editingUser.firstName} ${editingUser.lastName} added.`,
-          life:     3000,
+          summary: "Created",
+          detail: `${editingUser.firstName} ${editingUser.lastName} added.`,
+          life: 3000,
         });
       }
 
       setFormDialogVisible(false);
-      refetch();   // ← reflects the created/updated user from server
+      refetch();
     } catch (error: any) {
       toast.current?.show({
         severity: "error",
-        summary:  "Error",
-        detail:   error?.response?.data?.message ?? "Failed to save user",
-        life:     3000,
+        summary: "Error",
+        detail: error?.response?.data?.message ?? "Failed to save user",
+        life: 3000,
       });
     } finally {
       setActionLoading(false);
@@ -264,7 +297,11 @@ export default function AdminUsersRolesPage() {
             Manage admin and vendor user accounts
           </p>
         </div>
-        <Button label="Add User" icon="pi pi-user-plus" onClick={handleCreate} />
+        <Button
+          label="Add User"
+          icon="pi pi-user-plus"
+          onClick={handleCreate}
+        />
       </div>
 
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
@@ -294,7 +331,12 @@ export default function AdminUsersRolesPage() {
           className="w-56"
         />
         {(filters.role || filters.status) && (
-          <Button label="Clear" text icon="pi pi-times" onClick={clearFilters} />
+          <Button
+            label="Clear"
+            text
+            icon="pi pi-times"
+            onClick={clearFilters}
+          />
         )}
       </div>
 
@@ -312,45 +354,52 @@ export default function AdminUsersRolesPage() {
         onPageChange={onPageChange}
         columns={[
           {
-            field:  "firstName",
+            field: "firstName",
             header: "Name",
             sortable: true,
             body: (row: AppUser) => `${row.firstName} ${row.lastName}`,
           },
           { field: "email", header: "Email", sortable: true, filter: true },
           {
-            field:  "role",
+            field: "role",
             header: "Role",
             sortable: true,
-            body: (row: AppUser) => <span className="capitalize">{row.role?.name ?? "—"}</span>,
+            body: (row: AppUser) => (
+              <span className="capitalize">{row.role?.name ?? "—"}</span>
+            ),
           },
           {
-            field:  "sapVendorId",
+            field: "sapVendorId",
             header: "Vendor Code",
             body: (row: AppUser) => row.sapVendorId ?? "—",
           },
           {
-            field:  "lastLoginAt",
+            field: "lastLoginAt",
             header: "Last Login",
             sortable: true,
             body: (row: AppUser) =>
-              row.lastLoginAt ? new Date(row.lastLoginAt).toLocaleString() : "Never",
+              row.lastLoginAt
+                ? new Date(row.lastLoginAt).toLocaleString()
+                : "Never",
           },
           {
-            field:  "createdAt",
+            field: "createdAt",
             header: "Created",
             sortable: true,
-            body: (row: AppUser) => new Date(row.createdAt).toLocaleDateString(),
+            body: (row: AppUser) =>
+              new Date(row.createdAt).toLocaleDateString(),
           },
           {
-            field:  "status",
+            field: "status",
             header: "Status",
             sortable: true,
             filter: true,
             body: (row: AppUser) => {
               const badge = STATUS_BADGE[row.status];
               return (
-                <span className={`text-xs font-medium px-2 py-1 rounded-full ${badge.className}`}>
+                <span
+                  className={`text-xs font-medium px-2 py-1 rounded-full ${badge.className}`}
+                >
                   {badge.label}
                 </span>
               );
@@ -361,7 +410,11 @@ export default function AdminUsersRolesPage() {
 
       {/* View Dialog */}
       <Dialog
-        header={selectedUser ? `${selectedUser.firstName} ${selectedUser.lastName}` : ""}
+        header={
+          selectedUser
+            ? `${selectedUser.firstName} ${selectedUser.lastName}`
+            : ""
+        }
         visible={viewDialogVisible}
         onHide={() => setViewDialogVisible(false)}
         style={{ width: "480px" }}
@@ -372,114 +425,83 @@ export default function AdminUsersRolesPage() {
             <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
               {[
                 { label: "First Name", value: selectedUser.firstName },
-                { label: "Last Name",  value: selectedUser.lastName },
-                { label: "Email",      value: selectedUser.email },
-                { label: "Role",       value: selectedUser.role?.name },
+                { label: "Last Name", value: selectedUser.lastName },
+                { label: "Email", value: selectedUser.email },
+                { label: "Role", value: selectedUser.role?.name },
                 ...(selectedUser.sapVendorId
                   ? [{ label: "Vendor Code", value: selectedUser.sapVendorId }]
                   : []),
-                { label: "Status",           value: STATUS_BADGE[selectedUser.status]?.label },
-                { label: "Email Verified",   value: selectedUser.isEmailVerified ? "Yes" : "No" },
-                { label: "First Login Done", value: selectedUser.isFirstLoginVerified ? "Yes" : "No" },
+                {
+                  label: "Status",
+                  value: STATUS_BADGE[selectedUser.status]?.label,
+                },
+                {
+                  label: "Email Verified",
+                  value: selectedUser.isEmailVerified ? "Yes" : "No",
+                },
+                {
+                  label: "First Login Done",
+                  value: selectedUser.isFirstLoginVerified ? "Yes" : "No",
+                },
                 {
                   label: "Last Login",
                   value: selectedUser.lastLoginAt
                     ? new Date(selectedUser.lastLoginAt).toLocaleString()
                     : "Never",
                 },
-                { label: "Created At", value: new Date(selectedUser.createdAt).toLocaleDateString() },
+                {
+                  label: "Created At",
+                  value: new Date(selectedUser.createdAt).toLocaleDateString(),
+                },
               ].map((f) => (
                 <div key={f.label}>
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">{f.label}</p>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                    {f.label}
+                  </p>
                   <p className="font-medium capitalize">{f.value}</p>
                 </div>
               ))}
             </div>
             <div className="flex justify-end gap-2 pt-2 border-t border-border">
-              <Button label="Close" outlined severity="secondary" onClick={() => setViewDialogVisible(false)} />
               <Button
+                label="Close"
+                outlined
+                severity="secondary"
+                onClick={() => setViewDialogVisible(false)}
+              />
+              {/* <Button
                 label="Edit"
                 icon="pi pi-pencil"
-                onClick={() => { setViewDialogVisible(false); handleEdit(selectedUser); }}
-              />
+                onClick={() => {
+                  setViewDialogVisible(false);
+                  handleEdit(selectedUser);
+                }}
+              /> */}
             </div>
           </div>
         )}
       </Dialog>
 
       {/* Add / Edit Dialog */}
-      <Dialog
-        header={isEditing ? `Edit — ${editingUser.firstName} ${editingUser.lastName}` : "Add New User"}
+      <UserFormDialog
         visible={formDialogVisible}
         onHide={() => setFormDialogVisible(false)}
-        style={{ width: "520px" }}
-        modal
-      >
-        <div className="space-y-4 pt-2">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-foreground">First Name *</label>
-              <InputText value={editingUser.firstName} onChange={(e) => set("firstName", e.target.value)} placeholder="e.g. Rajesh" />
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-foreground">Last Name *</label>
-              <InputText value={editingUser.lastName} onChange={(e) => set("lastName", e.target.value)} placeholder="e.g. Kumar" />
-            </div>
-
-            <div className="flex flex-col gap-1.5 md:col-span-2">
-              <label className="text-sm font-medium text-foreground">Email *</label>
-              <InputText value={editingUser.email} onChange={(e) => set("email", e.target.value)} placeholder="user@company.com" />
-            </div>
-
-            {!isEditing && (
-              <div className="flex flex-col gap-1.5 md:col-span-2">
-                <label className="text-sm font-medium text-foreground">Password *</label>
-                <Password
-                  value={editingUser.password ?? ""}
-                  onChange={(e) => set("password", e.target.value)}
-                  placeholder="Temporary password"
-                  toggleMask
-                  className="w-full"
-                  inputClassName="w-full"
-                />
-                <p className="text-xs text-muted-foreground">
-                  User will be required to verify identity via OTP on first login.
-                </p>
-              </div>
-            )}
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-foreground">Role *</label>
-              <Dropdown
-                value={editingUser.roleId}
-                options={roleDropdownOptions}
-                onChange={(e) => set("roleId", e.value)}
-                placeholder="Select role"
-              />
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-foreground">Status</label>
-              <Dropdown
-                value={editingUser.status}
-                options={STATUS_OPTIONS}
-                onChange={(e) => set("status", e.value)}
-                disabled={!isEditing}
-              />
-            </div>
-          </div>
-          <div className="flex justify-end gap-2 pt-2 border-t border-border">
-            <Button label="Cancel" outlined severity="secondary" onClick={() => setFormDialogVisible(false)} disabled={actionLoading} />
-            <Button
-              label={isEditing ? "Update" : "Add User"}
-              icon="pi pi-check"
-              loading={actionLoading}
-              onClick={handleSave}
-            />
-          </div>
-        </div>
-      </Dialog>
+        title={
+          isEditing
+            ? `Edit — ${editingUser.firstName} ${editingUser.lastName}`
+            : "Add New User"
+        }
+        user={editingUser}
+        loading={actionLoading}
+        showPassword={!isEditing}
+        showRole
+        showStatus={isEditing}
+        roleOptions={roleDropdownOptions}
+        statusOptions={STATUS_OPTIONS}
+        onChange={set as any}
+        onSave={handleSave}
+        saveLabel={isEditing ? "Update" : "Add User"}
+      />
     </div>
   );
 }

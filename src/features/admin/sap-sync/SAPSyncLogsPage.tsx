@@ -78,6 +78,7 @@ export default function SAPSyncLogsPage() {
     totalRecords,
     loading,
     rows,
+    first,
     onPageChange,
     setSearch,
     filters,
@@ -288,6 +289,7 @@ export default function SAPSyncLogsPage() {
         data={logs}
         loading={loading}
         rows={rows}
+        first={first}
         lazy
         totalRecords={totalRecords}
         globalSearch
